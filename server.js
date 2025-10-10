@@ -1,18 +1,21 @@
-import express from "express"
-import cors from "cors"
-import { connectdb } from "./config/db.js";
+import express from "express";
+import dotenv from "dotenv";
+import connectDB from "./config/db.js";
 
-import "dotenv/config.js"
+import clientRoutes from "./routes/clientRoutes.js";
+import adminRoutes from "./routes/adminRoutes.js";
+import retailerRoutes from "./routes/retailerRoutes.js";
 
-const app=express();
+dotenv.config();
+connectDB();
 
-const port=4000;
-app.use(express.json())
-app.use(cors());
-connectdb();
+const app = express();
+app.use(express.json());
 
-app.listen(port,()=>{
-    console.log(`server started on http://localhost:${port}`)
-})
+// Routes
+app.use("/api/client", clientRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/retailer", retailerRoutes);
 
-
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
