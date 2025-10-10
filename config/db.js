@@ -12,4 +12,4 @@ const connectDB = async () => {
   }
 };
 
-export default connectDB; // ✅ default export
+export default connectDB;
