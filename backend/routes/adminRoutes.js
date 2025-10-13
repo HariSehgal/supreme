@@ -1,19 +1,28 @@
-// backend/routes/adminRoutes.js
 import express from "express";
-import { loginAdmin, addAdmin, addClientAdmin, addClientUser, protect } from "../controllers/adminController.js";
+import {
+  loginAdmin,
+  addAdmin,
+  addClientAdmin,
+  addClientUser,
+  loginClientAdmin,
+  protect,
+} from "../controllers/adminController.js";
 
 const router = express.Router();
 
-// ===== Admin login =====
+// Admin login
 router.post("/login", loginAdmin);
 
-// ===== Add new admin =====
-router.post("/add", protect, addAdmin);
+// Admin adds new admin
+router.post("/add-admin", protect, addAdmin);
 
-// ===== Add client admin =====
-router.post("/client-admin", protect, addClientAdmin);
+// Admin adds client admin
+router.post("/add-client-admin", protect, addClientAdmin);
 
-// ===== Add client user =====
-router.post("/client-user", protect, addClientUser);
+// Admin adds client user
+router.post("/add-client-user", protect, addClientUser);
+
+// Client admin login
+router.post("/client-admin-login", loginClientAdmin);
 
 export default router;
