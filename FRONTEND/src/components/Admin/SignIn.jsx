@@ -58,12 +58,14 @@ const SignIn = () => {
                     </div>
 
                     {/* Sign In Button */}
-                    <button
-                        type="submit"
-                        className="w-full bg-purple-700 text-white py-2 rounded-lg font-medium hover:bg-purple-800 transition"
-                    >
-                        Sign in
-                    </button>
+                    <Link to="/dashboard">
+                        <button
+                            type="button"
+                            className="w-full bg-purple-700 text-white py-2 rounded-lg font-medium hover:bg-purple-800 transition"
+                        >
+                            Sign in
+                        </button>
+                    </Link>
                 </form>
 
                 {/* Divider */}
