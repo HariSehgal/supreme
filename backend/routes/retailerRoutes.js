@@ -1,24 +1,27 @@
 import express from "express";
-import { registerRetailer, loginRetailer, getRetailerProfile } from "../controllers/retailerController.js";
-import { upload } from "../middleware/upload.js";
-import { protect } from "../middleware/authMiddleware.js";
+import {
+  sendOtp,
+  verifyOtp,
+  registerRetailer,
+  loginRetailer,
+  getRetailerProfile,
+} from "../controllers/retailerController.js";
 
 const router = express.Router();
 
+// Send OTP to phone
+router.post("/send-otp", sendOtp);
 
-router.post(
-  "/register",
-  upload.fields([
-    { name: "govtIdPhoto", maxCount: 1 },
-    { name: "personPhoto", maxCount: 1 },
-    { name: "signature", maxCount: 1 },
-    { name: "outletPhoto", maxCount: 1 },
-  ]),
-  registerRetailer
-);
+// Verify OTP
+router.post("/verify-otp", verifyOtp);
 
+// Register retailer (after OTP verified)
+router.post("/register", registerRetailer);
 
+// Login retailer
 router.post("/login", loginRetailer);
-router.get("/:id", protect, getRetailerProfile);
+
+// Get retailer profile by ID
+router.get("/:id", getRetailerProfile);
 
 export default router;

@@ -1,111 +1,147 @@
 import { Retailer } from "../models/user.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import mongoose from "mongoose";
+import twilio from "twilio";
+import dotenv from "dotenv";
 
-/**
- * @desc Register new retailer
- * @route POST /api/retailer/register
- * @access Public
- */
+dotenv.config();
+
+// ===============================
+// Twilio Configuration
+// ===============================
+const accountSid = process.env.TWILIO_ACCOUNT_SID;  // Correct env variable
+const authToken = process.env.TWILIO_AUTH_TOKEN;
+const fromNumber = process.env.TWILIO_PHONE_NUMBER;
+const client = twilio(accountSid, authToken);
+
+// Temporary in-memory store for OTPs with expiry
+const otpStore = new Map();
+
+/* ===============================
+   SEND OTP (Phone only)
+=============================== */
+export const sendOtp = async (req, res) => {
+  try {
+    const { phone } = req.body;
+    if (!phone) return res.status(400).json({ message: "Phone number required" });
+
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    otpStore.set(phone, { otp, expires: Date.now() + 5 * 60 * 1000 }); // 5 min expiry
+
+    // Send OTP via Twilio
+    await client.messages.create({
+      body: `Your verification code is ${otp}`,
+      from: fromNumber,
+      to: phone.startsWith("+") ? phone : `+91${phone}`,
+    });
+
+    console.log(`✅ OTP sent to ${phone}: ${otp}`);
+    res.status(200).json({ message: "OTP sent successfully" });
+  } catch (error) {
+    console.error("OTP send error:", error);
+    res.status(500).json({ message: "Failed to send OTP", error: error.message });
+  }
+};
+
+/* ===============================
+   VERIFY OTP
+=============================== */
+export const verifyOtp = async (req, res) => {
+  try {
+    const { phone, otp } = req.body;
+    if (!phone || !otp) return res.status(400).json({ message: "Phone number and OTP required" });
+
+    const record = otpStore.get(phone);
+    if (!record) return res.status(400).json({ message: "No OTP found for this number" });
+    if (Date.now() > record.expires) {
+      otpStore.delete(phone);
+      return res.status(400).json({ message: "OTP expired" });
+    }
+    if (record.otp !== otp) return res.status(400).json({ message: "Invalid OTP" });
+
+    otpStore.delete(phone);
+    res.status(200).json({ message: "OTP verified successfully" });
+  } catch (error) {
+    console.error("OTP verify error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+/* ===============================
+   REGISTER RETAILER (with phone OTP)
+=============================== */
 export const registerRetailer = async (req, res) => {
   try {
-    const {
-      name,
-      contactNo,
-      email,
-      address,
-      dob,
-      gender,
-      govtIdType,
-      govtIdNumber,
-      shopName,
-      businessType,
-      ownershipType,
-      dateOfEstablishment,
-      GSTNo,
-      PANCard,
-      bankName,
-      accountNumber,
-      IFSC,
-      branchName,
-      state,
-      city,
-      partOfIndia, // N/E/W/S
-      createdBy, // RetailerSelf or Employee
-      password,
-    } = req.body;
+    const body = req.body;
+    const files = req.files || {};
+    const { contactNo } = body;
 
-    // Check existing email
-    const existingRetailer = await Retailer.findOne({ email });
-    if (existingRetailer) {
-      return res.status(400).json({ message: "Email already registered" });
+    // Ensure OTP is verified
+    if (otpStore.has(contactNo)) {
+      return res.status(400).json({ message: "Please verify your phone number before registration" });
     }
 
-    // Handle uploaded files (from Multer)
-    const files = req.files || {};
-    const govtIdPhoto = files.govtIdPhoto?.[0];
-    const personPhoto = files.personPhoto?.[0];
-    const signature = files.signature?.[0];
-    const outletPhoto = files.outletPhoto?.[0];
+    const shopAddress = {
+      address: body["shopDetails.shopAddress.address"] || body.address,
+      city: body["shopDetails.shopAddress.city"] || body.city,
+      state: body["shopDetails.shopAddress.state"] || body.state,
+      geoTags: {
+        lat: parseFloat(body["shopDetails.shopAddress.geoTags.lat"]) || 0,
+        lng: parseFloat(body["shopDetails.shopAddress.geoTags.lng"]) || 0,
+      },
+    };
 
-    // Create new retailer
+    if (!shopAddress.city || !shopAddress.state) {
+      return res.status(400).json({ message: "City and State are required in shop address" });
+    }
+
+    const shopDetails = {
+      shopName: body["shopDetails.shopName"] || body.shopName,
+      businessType: body["shopDetails.businessType"] || body.businessType,
+      ownershipType: body["shopDetails.ownershipType"] || body.ownershipType,
+      dateOfEstablishment: body["shopDetails.dateOfEstablishment"] || body.dateOfEstablishment,
+      GSTNo: body["shopDetails.GSTNo"] || body.GSTNo,
+      PANCard: body["shopDetails.PANCard"] || body.PANCard,
+      shopAddress,
+      outletPhoto: files.outletPhoto
+        ? { data: files.outletPhoto[0].buffer, contentType: files.outletPhoto[0].mimetype }
+        : undefined,
+    };
+
+    const bankDetails = {
+      bankName: body["bankDetails.bankName"] || body.bankName,
+      accountNumber: body["bankDetails.accountNumber"] || body.accountNumber,
+      IFSC: body["bankDetails.IFSC"] || body.IFSC,
+      branchName: body["bankDetails.branchName"] || body.branchName,
+    };
+
+    const existingRetailer = await Retailer.findOne({ email: body.email });
+    if (existingRetailer) return res.status(400).json({ message: "Email already registered" });
+
     const retailer = new Retailer({
-      name,
+      name: body.name,
       contactNo,
-      email,
-      address,
-      dob,
-      gender,
-      govtIdType,
-      govtIdNumber,
-      govtIdPhoto: govtIdPhoto
-        ? {
-            data: govtIdPhoto.buffer,
-            contentType: govtIdPhoto.mimetype,
-          }
+      email: body.email,
+      address: body.address,
+      dob: body.dob,
+      gender: body.gender,
+      govtIdType: body.govtIdType,
+      govtIdNumber: body.govtIdNumber,
+      govtIdPhoto: files.govtIdPhoto
+        ? { data: files.govtIdPhoto[0].buffer, contentType: files.govtIdPhoto[0].mimetype }
         : undefined,
-      personPhoto: personPhoto
-        ? {
-            data: personPhoto.buffer,
-            contentType: personPhoto.mimetype,
-          }
+      personPhoto: files.personPhoto
+        ? { data: files.personPhoto[0].buffer, contentType: files.personPhoto[0].mimetype }
         : undefined,
-      signature: signature
-        ? {
-            data: signature.buffer,
-            contentType: signature.mimetype,
-          }
+      signature: files.signature
+        ? { data: files.signature[0].buffer, contentType: files.signature[0].mimetype }
         : undefined,
-      shopDetails: {
-        shopName,
-        businessType,
-        ownershipType,
-        dateOfEstablishment,
-        GSTNo,
-        PANCard,
-        shopAddress: {
-          address,
-          geoTags: { lat: 0, lng: 0 }, // optional future geo tag
-          state,
-          city,
-        },
-        outletPhoto: outletPhoto
-          ? {
-              data: outletPhoto.buffer,
-              contentType: outletPhoto.mimetype,
-            }
-          : undefined,
-      },
-      bankDetails: {
-        bankName,
-        accountNumber,
-        IFSC,
-        branchName,
-      },
-      partOfIndia: partOfIndia || "N",
-      createdBy: createdBy || "RetailerSelf",
-      password,
+      shopDetails,
+      bankDetails,
+      partOfIndia: body.partOfIndia || "N",
+      createdBy: body.createdBy || "RetailerSelf",
+      password: await bcrypt.hash(body.password, 10),
     });
 
     await retailer.save();
@@ -120,24 +156,17 @@ export const registerRetailer = async (req, res) => {
   }
 };
 
-/**
- * @desc Login retailer
- * @route POST /api/retailer/login
- * @access Public
- */
+/* ===============================
+   LOGIN RETAILER
+=============================== */
 export const loginRetailer = async (req, res) => {
   try {
     const { email, password } = req.body;
-
     const retailer = await Retailer.findOne({ email });
-    if (!retailer) {
-      return res.status(400).json({ message: "Invalid credentials" });
-    }
+    if (!retailer) return res.status(400).json({ message: "Invalid credentials" });
 
     const isMatch = await bcrypt.compare(password, retailer.password);
-    if (!isMatch) {
-      return res.status(400).json({ message: "Invalid credentials" });
-    }
+    if (!isMatch) return res.status(400).json({ message: "Invalid credentials" });
 
     const token = jwt.sign(
       { id: retailer._id, email: retailer.email, role: "retailer" },
@@ -161,19 +190,14 @@ export const loginRetailer = async (req, res) => {
   }
 };
 
-/**
- * @desc Get retailer profile
- * @route GET /api/retailer/:id
- * @access Private (requires JWT)
- */
+/* ===============================
+   GET RETAILER PROFILE
+=============================== */
 export const getRetailerProfile = async (req, res) => {
   try {
     const { id } = req.params;
     const retailer = await Retailer.findById(id).select("-password");
-
-    if (!retailer) {
-      return res.status(404).json({ message: "Retailer not found" });
-    }
+    if (!retailer) return res.status(404).json({ message: "Retailer not found" });
 
     res.status(200).json(retailer);
   } catch (error) {
