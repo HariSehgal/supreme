@@ -1,4 +1,4 @@
-import { Retailer } from "../models/user.js";
+import { Retailer, Campaign } from "../models/user.js";
 import jwt from "jsonwebtoken";
 import twilio from "twilio";
 import dotenv from "dotenv";
@@ -24,11 +24,9 @@ export const sendOtp = async (req, res) => {
     const { phone } = req.body;
     if (!phone) return res.status(400).json({ message: "Phone number required" });
 
-    // Generate 6-digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    otpStore.set(phone, { otp, expires: Date.now() + 5 * 60 * 1000 }); // 5 min expiry
+    otpStore.set(phone, { otp, expires: Date.now() + 5 * 60 * 1000 });
 
-    // Send OTP via Twilio
     await client.messages.create({
       body: `Your verification code is ${otp}`,
       from: fromNumber,
@@ -49,7 +47,8 @@ export const sendOtp = async (req, res) => {
 export const verifyOtp = async (req, res) => {
   try {
     const { phone, otp } = req.body;
-    if (!phone || !otp) return res.status(400).json({ message: "Phone number and OTP required" });
+    if (!phone || !otp)
+      return res.status(400).json({ message: "Phone number and OTP required" });
 
     const record = otpStore.get(phone);
     if (!record) return res.status(400).json({ message: "No OTP found for this number" });
@@ -79,12 +78,11 @@ export const registerRetailer = async (req, res) => {
     if (!email || !contactNo)
       return res.status(400).json({ message: "Email and contact number are required" });
 
-    // Ensure OTP is verified (prevent unverified registration)
+    // Must have verified OTP before registration
     if (otpStore.has(contactNo)) {
       return res.status(400).json({ message: "Please verify your phone number before registration" });
     }
 
-    // Personal address
     const personalAddress = {
       address: body.address,
       city: body.city,
@@ -95,7 +93,6 @@ export const registerRetailer = async (req, res) => {
       },
     };
 
-    // Shop address
     const shopAddress = {
       address: body["shopDetails.shopAddress.address"] || body.shopAddress,
       city: body["shopDetails.shopAddress.city"] || body.shopCity,
@@ -126,7 +123,6 @@ export const registerRetailer = async (req, res) => {
       branchName: body["bankDetails.branchName"] || body.branchName,
     };
 
-    // Check for existing retailer by email or phone
     const existingRetailer = await Retailer.findOne({
       $or: [{ contactNo }, { email }],
     });
@@ -176,11 +172,14 @@ export const registerRetailer = async (req, res) => {
 export const loginRetailer = async (req, res) => {
   try {
     const { contactNo } = req.body;
-    if (!contactNo) return res.status(400).json({ message: "Phone number required" });
+    if (!contactNo)
+      return res.status(400).json({ message: "Phone number required" });
 
     const retailer = await Retailer.findOne({ contactNo });
-    if (!retailer) return res.status(400).json({ message: "Retailer not found" });
-    if (!retailer.phoneVerified) return res.status(400).json({ message: "Phone not verified" });
+    if (!retailer)
+      return res.status(400).json({ message: "Retailer not found" });
+    if (!retailer.phoneVerified)
+      return res.status(400).json({ message: "Phone not verified" });
 
     const token = jwt.sign(
       { id: retailer._id, contactNo: retailer.contactNo, role: "retailer" },
@@ -212,11 +211,26 @@ export const getRetailerProfile = async (req, res) => {
   try {
     const { id } = req.params;
     const retailer = await Retailer.findById(id).select("-password");
-    if (!retailer) return res.status(404).json({ message: "Retailer not found" });
+    if (!retailer)
+      return res.status(404).json({ message: "Retailer not found" });
 
     res.status(200).json(retailer);
   } catch (error) {
     console.error("Get retailer error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+/* ===============================
+   GET ALL CAMPAIGNS (JWT Protected)
+=============================== */
+export const getAllCampaigns = async (req, res) => {
+  try {
+    // JWT-protected: req.retailer added by auth middleware
+    const campaigns = await Campaign.find().sort({ createdAt: -1 });
+    res.status(200).json({ message: "Campaigns fetched successfully", campaigns });
+  } catch (error) {
+    console.error("Get campaigns error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };

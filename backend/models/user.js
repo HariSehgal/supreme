@@ -107,7 +107,7 @@ const retailerSchema = new Schema(
     name: { type: String, required: true },
     contactNo: { type: String, required: true, unique: true },
     email: String,
-    password: { type: String }, // ✅ Added password field
+    password: { type: String },
     gender: { type: String, enum: ["Male", "Female", "Other"], required: true },
 
     govtIdType: String,
@@ -161,7 +161,6 @@ const retailerSchema = new Schema(
 =============================== */
 retailerSchema.pre("save", async function (next) {
   try {
-    // ✅ Automatically set password as hashed contact number
     if (!this.password && this.contactNo) {
       const salt = await bcrypt.genSalt(10);
       this.password = await bcrypt.hash(this.contactNo, salt);
@@ -192,3 +191,33 @@ retailerSchema.pre("save", async function (next) {
 });
 
 export const Retailer = model("Retailer", retailerSchema);
+
+/* ===============================
+   CAMPAIGN SCHEMA (NEW)
+=============================== */
+const campaignSchema = new Schema(
+  {
+    name: { type: String, required: true, trim: true },
+    client: { type: String, required: true, trim: true },
+    type: {
+      type: String,
+      enum: [
+        "Retailer Enrolment",
+        "Display Payment",
+        "Incentive Payment",
+        "Others",
+      ],
+      required: true,
+    },
+    region: {
+      type: String,
+      enum: ["North", "South", "East", "West", "All"],
+      required: true,
+    },
+    state: { type: String, required: true },
+    createdBy: { type: Schema.Types.ObjectId, ref: "Admin", required: true },
+  },
+  { timestamps: true }
+);
+
+export const Campaign = model("Campaign", campaignSchema);

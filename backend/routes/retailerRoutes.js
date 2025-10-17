@@ -5,8 +5,10 @@ import {
   registerRetailer,
   loginRetailer,
   getRetailerProfile,
+  getAllCampaigns,
 } from "../controllers/retailerController.js";
 import multer from "multer";
+import { protect } from "../middleware/authMiddleware.js"; // JWT middleware
 
 // ===============================
 // Multer Setup
@@ -25,6 +27,10 @@ const uploadFiles = upload.fields([
 
 const router = express.Router();
 
+// ===============================
+// RETAILER AUTH ROUTES
+// ===============================
+
 // Send OTP to phone
 router.post("/send-otp", sendOtp);
 
@@ -37,7 +43,14 @@ router.post("/register", uploadFiles, registerRetailer);
 // Login retailer
 router.post("/login", loginRetailer);
 
-// Get retailer profile by ID
-router.get("/profile/:id", getRetailerProfile);
+// ===============================
+// PROTECTED ROUTES
+// ===============================
+
+// Get retailer profile by ID (JWT protected)
+router.get("/profile/:id", protect, getRetailerProfile);
+
+// Get all campaigns available to retailers (JWT protected)
+router.get("/campaigns", protect, getAllCampaigns);
 
 export default router;

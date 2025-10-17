@@ -1,4 +1,4 @@
-import { Admin, ClientAdmin, ClientUser, Retailer } from "../models/user.js";
+import { Admin, ClientAdmin, ClientUser, Retailer, Campaign } from "../models/user.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
@@ -46,7 +46,6 @@ export const addAdmin = async (req, res) => {
     if (!req.user || req.user.role !== "admin")
       return res.status(403).json({ message: "Only existing admins can add new admins" });
 
-    // Check across all user collections to prevent duplicate emails
     const existing =
       (await Admin.findOne({ email })) ||
       (await ClientAdmin.findOne({ email })) ||
@@ -58,7 +57,7 @@ export const addAdmin = async (req, res) => {
     const newAdmin = new Admin({
       name,
       email,
-      password, // hashed automatically by schema middleware
+      password,
       role: "admin",
       _adminKey: process.env.ADMIN_CREATION_KEY,
     });
@@ -89,7 +88,6 @@ export const addClientAdmin = async (req, res) => {
 
     const hashedPass = await bcrypt.hash(password, 10);
 
-    // Automatically generate registrationDetails using email and hashed password
     const newClientAdmin = new ClientAdmin({
       name,
       email,
@@ -97,8 +95,8 @@ export const addClientAdmin = async (req, res) => {
       organizationName,
       password: hashedPass,
       registrationDetails: {
-        username: email,       // using email as username
-        password: hashedPass,  // same hashed password
+        username: email,
+        password: hashedPass,
       },
     });
 
@@ -202,5 +200,66 @@ export const protect = (req, res, next) => {
   } catch (error) {
     console.error("JWT verification error:", error);
     res.status(401).json({ message: "Invalid or expired token" });
+  }
+};
+
+/* ======================================================
+    CAMPAIGN MANAGEMENT (only admins)
+====================================================== */
+
+// Add new campaign
+export const addCampaign = async (req, res) => {
+  try {
+    const { name, client, type, region, state } = req.body;
+
+    if (!req.user || req.user.role !== "admin")
+      return res.status(403).json({ message: "Only admins can create campaigns" });
+
+    if (!name || !client || !type || !region || !state)
+      return res.status(400).json({ message: "All fields are required" });
+
+    const campaign = new Campaign({
+      name,
+      client,
+      type,
+      region,
+      state,
+      createdBy: req.user.id,
+    });
+
+    await campaign.save();
+    res.status(201).json({ message: "Campaign created successfully", campaign });
+  } catch (error) {
+    console.error("Add campaign error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Get all campaigns
+export const getAllCampaigns = async (req, res) => {
+  try {
+    const campaigns = await Campaign.find().populate("createdBy", "name email");
+    res.status(200).json({ campaigns });
+  } catch (error) {
+    console.error("Get campaigns error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Delete a campaign
+export const deleteCampaign = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!req.user || req.user.role !== "admin")
+      return res.status(403).json({ message: "Only admins can delete campaigns" });
+
+    const campaign = await Campaign.findByIdAndDelete(id);
+    if (!campaign) return res.status(404).json({ message: "Campaign not found" });
+
+    res.status(200).json({ message: "Campaign deleted successfully" });
+  } catch (error) {
+    console.error("Delete campaign error:", error);
+    res.status(500).json({ message: "Server error" });
   }
 };

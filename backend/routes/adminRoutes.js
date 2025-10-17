@@ -6,9 +6,18 @@ import {
   addClientUser,
   loginClientAdmin,
   protect,
+  // Campaign controllers
+  addCampaign,
+  getAllCampaigns,
+  
+  deleteCampaign,
 } from "../controllers/adminController.js";
 
 const router = express.Router();
+
+// ===============================
+// ADMIN AUTH ROUTES
+// ===============================
 
 // Admin login
 router.post("/login", loginAdmin);
@@ -24,5 +33,24 @@ router.post("/add-client-user", protect, addClientUser);
 
 // Client admin login
 router.post("/client-admin-login", loginClientAdmin);
+
+// ===============================
+// CAMPAIGN ROUTES (admin only)
+// ===============================
+
+// Create a new campaign
+router.post("/campaign", protect, addCampaign);
+
+// Get all campaigns
+router.get("/campaigns", protect, getAllCampaigns);
+
+// Get campaign by ID
+
+
+// Update a campaign by ID
+
+
+// Delete a campaign by ID
+router.delete("/campaign/:id", protect, deleteCampaign);
 
 export default router;
