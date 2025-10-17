@@ -1,5 +1,4 @@
 import { Retailer } from "../models/user.js";
-import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import twilio from "twilio";
 import dotenv from "dotenv";
@@ -9,7 +8,7 @@ dotenv.config();
 // ===============================
 // Twilio Configuration
 // ===============================
-const accountSid = process.env.TWILIO_ACCOUNT_SID;  // Correct env variable
+const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
 const fromNumber = process.env.TWILIO_PHONE_NUMBER;
 const client = twilio(accountSid, authToken);
@@ -75,26 +74,37 @@ export const registerRetailer = async (req, res) => {
   try {
     const body = req.body;
     const files = req.files || {};
-    const { contactNo } = body;
+    const { contactNo, email } = body;
 
-    // Ensure OTP is verified
+    if (!email || !contactNo)
+      return res.status(400).json({ message: "Email and contact number are required" });
+
+    // Ensure OTP is verified (prevent unverified registration)
     if (otpStore.has(contactNo)) {
       return res.status(400).json({ message: "Please verify your phone number before registration" });
     }
 
+    // Personal address
+    const personalAddress = {
+      address: body.address,
+      city: body.city,
+      state: body.state,
+      geoTags: {
+        lat: parseFloat(body.geoTags?.lat) || 0,
+        lng: parseFloat(body.geoTags?.lng) || 0,
+      },
+    };
+
+    // Shop address
     const shopAddress = {
-      address: body["shopDetails.shopAddress.address"] || body.address,
-      city: body["shopDetails.shopAddress.city"] || body.city,
-      state: body["shopDetails.shopAddress.state"] || body.state,
+      address: body["shopDetails.shopAddress.address"] || body.shopAddress,
+      city: body["shopDetails.shopAddress.city"] || body.shopCity,
+      state: body["shopDetails.shopAddress.state"] || body.shopState,
       geoTags: {
         lat: parseFloat(body["shopDetails.shopAddress.geoTags.lat"]) || 0,
         lng: parseFloat(body["shopDetails.shopAddress.geoTags.lng"]) || 0,
       },
     };
-
-    if (!shopAddress.city || !shopAddress.state) {
-      return res.status(400).json({ message: "City and State are required in shop address" });
-    }
 
     const shopDetails = {
       shopName: body["shopDetails.shopName"] || body.shopName,
@@ -116,14 +126,17 @@ export const registerRetailer = async (req, res) => {
       branchName: body["bankDetails.branchName"] || body.branchName,
     };
 
-    const existingRetailer = await Retailer.findOne({ email: body.email });
-    if (existingRetailer) return res.status(400).json({ message: "Email already registered" });
+    // Check for existing retailer by email or phone
+    const existingRetailer = await Retailer.findOne({
+      $or: [{ contactNo }, { email }],
+    });
+    if (existingRetailer)
+      return res.status(400).json({ message: "Phone or email already registered" });
 
     const retailer = new Retailer({
       name: body.name,
       contactNo,
-      email: body.email,
-      address: body.address,
+      email,
       dob: body.dob,
       gender: body.gender,
       govtIdType: body.govtIdType,
@@ -137,11 +150,12 @@ export const registerRetailer = async (req, res) => {
       signature: files.signature
         ? { data: files.signature[0].buffer, contentType: files.signature[0].mimetype }
         : undefined,
+      personalAddress,
       shopDetails,
       bankDetails,
       partOfIndia: body.partOfIndia || "N",
       createdBy: body.createdBy || "RetailerSelf",
-      password: await bcrypt.hash(body.password, 10),
+      phoneVerified: true,
     });
 
     await retailer.save();
@@ -157,19 +171,19 @@ export const registerRetailer = async (req, res) => {
 };
 
 /* ===============================
-   LOGIN RETAILER
+   LOGIN RETAILER (Phone only)
 =============================== */
 export const loginRetailer = async (req, res) => {
   try {
-    const { email, password } = req.body;
-    const retailer = await Retailer.findOne({ email });
-    if (!retailer) return res.status(400).json({ message: "Invalid credentials" });
+    const { contactNo } = req.body;
+    if (!contactNo) return res.status(400).json({ message: "Phone number required" });
 
-    const isMatch = await bcrypt.compare(password, retailer.password);
-    if (!isMatch) return res.status(400).json({ message: "Invalid credentials" });
+    const retailer = await Retailer.findOne({ contactNo });
+    if (!retailer) return res.status(400).json({ message: "Retailer not found" });
+    if (!retailer.phoneVerified) return res.status(400).json({ message: "Phone not verified" });
 
     const token = jwt.sign(
-      { id: retailer._id, email: retailer.email, role: "retailer" },
+      { id: retailer._id, contactNo: retailer.contactNo, role: "retailer" },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
@@ -181,6 +195,7 @@ export const loginRetailer = async (req, res) => {
         id: retailer._id,
         name: retailer.name,
         uniqueId: retailer.uniqueId,
+        contactNo: retailer.contactNo,
         email: retailer.email,
       },
     });

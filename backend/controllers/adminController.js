@@ -76,7 +76,7 @@ export const addAdmin = async (req, res) => {
 ====================================================== */
 export const addClientAdmin = async (req, res) => {
   try {
-    const { name, email, contactNo, organizationName, username, password } = req.body;
+    const { name, email, contactNo, organizationName, password } = req.body;
 
     if (!req.user || req.user.role !== "admin")
       return res.status(403).json({ message: "Only admins can add client admins" });
@@ -89,19 +89,24 @@ export const addClientAdmin = async (req, res) => {
 
     const hashedPass = await bcrypt.hash(password, 10);
 
+    // Automatically generate registrationDetails using email and hashed password
     const newClientAdmin = new ClientAdmin({
       name,
       email,
       contactNo,
       organizationName,
-      registrationDetails: { username, password: hashedPass },
       password: hashedPass,
+      registrationDetails: {
+        username: email,       // using email as username
+        password: hashedPass,  // same hashed password
+      },
     });
 
     await newClientAdmin.save();
-    res
-      .status(201)
-      .json({ message: "Client admin created successfully", clientAdmin: newClientAdmin });
+    res.status(201).json({
+      message: "Client admin created successfully",
+      clientAdmin: newClientAdmin,
+    });
   } catch (error) {
     console.error("Add client admin error:", error);
     res.status(500).json({ message: "Server error" });

@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import bcrypt from "bcryptjs";
 
 const { Schema, model } = mongoose;
 
@@ -104,54 +105,34 @@ const retailerSchema = new Schema(
     retailerCode: { type: String, unique: true },
 
     name: { type: String, required: true },
-    contactNo: { type: String, required: true },
-    email: { type: String, required: true, unique: true },
+    contactNo: { type: String, required: true, unique: true },
+    email: String,
+    password: { type: String }, // ✅ Added password field
     gender: { type: String, enum: ["Male", "Female", "Other"], required: true },
 
     govtIdType: String,
     govtIdNumber: String,
     govtIdPhoto: { data: Buffer, contentType: String },
     personPhoto: { data: Buffer, contentType: String },
-    signature: { data: Buffer, contentType: String },
-
-    // OTP Verification fields
-    otp: { type: String },
-    otpVerified: { type: Boolean, default: false },
-    otpExpiry: { type: Date },
+    registrationForm: { data: Buffer, contentType: String },
 
     shopDetails: {
       type: {
         shopName: String,
         businessType: String,
-        shopAddress: {
-          type: {
-            address: String,
-            geoTags: { lat: Number, lng: Number },
-            state: { type: String, required: true },
-            city: { type: String, required: true },
-          },
-          default: {
-            address: "",
-            geoTags: { lat: 0, lng: 0 },
-            state: "NA",
-            city: "NA",
-          },
-        },
         ownershipType: String,
         GSTNo: String,
         PANCard: String,
         outletPhoto: { data: Buffer, contentType: String },
-      },
-      default: {
-        shopName: "",
-        businessType: "",
         shopAddress: {
-          address: "",
-          geoTags: { lat: 0, lng: 0 },
-          state: "NA",
-          city: "NA",
+          address: String,
+          address2: String,
+          city: String,
+          state: String,
+          pincode: String,
         },
       },
+      default: {},
     },
 
     bankDetails: {
@@ -170,17 +151,21 @@ const retailerSchema = new Schema(
       default: "RetailerSelf",
     },
 
-    password: { type: String, required: true },
+    phoneVerified: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
 
 /* ===============================
-   AUTO-GENERATE UNIQUE IDs
+   AUTO-GENERATE CODES + PASSWORD
 =============================== */
 retailerSchema.pre("save", async function (next) {
   try {
-    if (!this.password) this.password = this.contactNo;
+    // ✅ Automatically set password as hashed contact number
+    if (!this.password && this.contactNo) {
+      const salt = await bcrypt.genSalt(10);
+      this.password = await bcrypt.hash(this.contactNo, salt);
+    }
 
     if (!this.uniqueId) {
       const state = this.shopDetails?.shopAddress?.state || "NA";
