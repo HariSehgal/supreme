@@ -103,19 +103,16 @@ const retailerSchema = new Schema(
   {
     uniqueId: { type: String, unique: true },
     retailerCode: { type: String, unique: true },
-
     name: { type: String, required: true },
     contactNo: { type: String, required: true, unique: true },
     email: String,
     password: { type: String },
     gender: { type: String, enum: ["Male", "Female", "Other"], required: true },
-
     govtIdType: String,
     govtIdNumber: String,
     govtIdPhoto: { data: Buffer, contentType: String },
     personPhoto: { data: Buffer, contentType: String },
     registrationForm: { data: Buffer, contentType: String },
-
     shopDetails: {
       type: {
         shopName: String,
@@ -134,7 +131,6 @@ const retailerSchema = new Schema(
       },
       default: {},
     },
-
     bankDetails: {
       type: {
         bankName: String,
@@ -144,13 +140,11 @@ const retailerSchema = new Schema(
       },
       default: {},
     },
-
     createdBy: {
       type: String,
       enum: ["RetailerSelf", "Employee"],
       default: "RetailerSelf",
     },
-
     phoneVerified: { type: Boolean, default: false },
   },
   { timestamps: true }
@@ -193,7 +187,42 @@ retailerSchema.pre("save", async function (next) {
 export const Retailer = model("Retailer", retailerSchema);
 
 /* ===============================
-   CAMPAIGN SCHEMA (NEW)
+   EMPLOYEE SCHEMA (UPDATED)
+=============================== */
+const employeeSchema = new Schema(
+  {
+    name: { type: String, required: true },
+    email: { type: String, required: true, unique: true },
+    phone: { type: String, required: true },
+    password: { type: String }, // <- remove required: true
+    gender: String,
+    address: String,
+    dob: Date,
+    organization: { type: Schema.Types.ObjectId, ref: "ClientAdmin" },
+    isFirstLogin: { type: Boolean, default: true },
+  },
+  { timestamps: true }
+);
+
+/* ===============================
+   AUTO-HASH PHONE AS INITIAL PASSWORD
+=============================== */
+employeeSchema.pre("save", async function (next) {
+  try {
+    if (this.isNew && this.phone) {
+      this.password = await bcrypt.hash(this.phone.toString(), 10);
+      this.isFirstLogin = true;
+    }
+    next();
+  } catch (err) {
+    next(err);
+  }
+});
+
+export const Employee = model("Employee", employeeSchema);
+
+/* ===============================
+   CAMPAIGN SCHEMA
 =============================== */
 const campaignSchema = new Schema(
   {

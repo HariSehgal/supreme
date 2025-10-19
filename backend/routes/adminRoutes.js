@@ -1,4 +1,5 @@
 import express from "express";
+import multer from "multer";
 import {
   loginAdmin,
   addAdmin,
@@ -6,14 +7,15 @@ import {
   addClientUser,
   loginClientAdmin,
   protect,
-  // Campaign controllers
   addCampaign,
   getAllCampaigns,
-  
   deleteCampaign,
+  addEmployee,
+  bulkAddEmployees,
 } from "../controllers/adminController.js";
 
 const router = express.Router();
+const upload = multer({ storage: multer.memoryStorage() });
 
 // ===============================
 // ADMIN AUTH ROUTES
@@ -35,6 +37,16 @@ router.post("/add-client-user", protect, addClientUser);
 router.post("/client-admin-login", loginClientAdmin);
 
 // ===============================
+// EMPLOYEE ROUTES (own organization)
+// ===============================
+
+// Single employee add
+router.post("/employee", protect, addEmployee);
+
+// Bulk upload employees via Excel/CSV
+router.post("/employees/bulk", protect, upload.single("file"), bulkAddEmployees);
+
+// ===============================
 // CAMPAIGN ROUTES (admin only)
 // ===============================
 
@@ -43,12 +55,6 @@ router.post("/campaign", protect, addCampaign);
 
 // Get all campaigns
 router.get("/campaigns", protect, getAllCampaigns);
-
-// Get campaign by ID
-
-
-// Update a campaign by ID
-
 
 // Delete a campaign by ID
 router.delete("/campaign/:id", protect, deleteCampaign);

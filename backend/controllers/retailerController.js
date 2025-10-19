@@ -226,9 +226,43 @@ export const getRetailerProfile = async (req, res) => {
 =============================== */
 export const getAllCampaigns = async (req, res) => {
   try {
-    // JWT-protected: req.retailer added by auth middleware
-    const campaigns = await Campaign.find().sort({ createdAt: -1 });
-    res.status(200).json({ message: "Campaigns fetched successfully", campaigns });
+    // Extract retailer from JWT
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) return res.status(401).json({ message: "Unauthorized: No token" });
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || "supremeSecretKey");
+    const retailer = await Retailer.findById(decoded.id);
+
+    if (!retailer) return res.status(404).json({ message: "Retailer not found" });
+
+    const retailerState = retailer.shopDetails?.shopAddress?.state || "";
+    const partOfIndia = retailer.partOfIndia || "N";
+
+    // Region mapping
+    const regionMap = {
+      N: "North",
+      S: "South",
+      E: "East",
+      W: "West",
+    };
+
+    const retailerRegion = regionMap[partOfIndia] || "North";
+
+    // Fetch campaigns that match retailer region or state or are open to all
+    const campaigns = await Campaign.find({
+      $or: [
+        { region: "All" },
+        { region: retailerRegion },
+        { state: retailerState },
+      ],
+    }).sort({ createdAt: -1 });
+
+    res.status(200).json({
+      message: "Campaigns fetched successfully",
+      region: retailerRegion,
+      state: retailerState,
+      campaigns,
+    });
   } catch (error) {
     console.error("Get campaigns error:", error);
     res.status(500).json({ message: "Server error", error: error.message });

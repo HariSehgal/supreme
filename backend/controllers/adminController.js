@@ -1,6 +1,7 @@
-import { Admin, ClientAdmin, ClientUser, Retailer, Campaign } from "../models/user.js";
+import { Admin, ClientAdmin, ClientUser, Retailer, Campaign ,Employee} from "../models/user.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import XLSX from "xlsx";
 
 /* ======================================================
     ADMIN LOGIN
@@ -260,6 +261,90 @@ export const deleteCampaign = async (req, res) => {
     res.status(200).json({ message: "Campaign deleted successfully" });
   } catch (error) {
     console.error("Delete campaign error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+export const addEmployee = async (req, res) => {
+  try {
+    const { name, email, contactNo, typeOfEmployee } = req.body;
+
+    if (!req.user || req.user.role !== "admin")
+      return res.status(403).json({ message: "Only admins can add employees" });
+
+    if (!name || !email || !contactNo || !typeOfEmployee)
+      return res.status(400).json({ message: "All fields are required" });
+
+    const existing = await Employee.findOne({ email });
+    if (existing) return res.status(409).json({ message: "Employee already exists" });
+
+    const newEmployee = new Employee({
+      name,
+      email,
+      phone: contactNo,
+      typeOfEmployee,
+      createdBy: req.user.id,
+    });
+
+    await newEmployee.save();
+    res.status(201).json({ message: "Employee added successfully", employee: newEmployee });
+  } catch (error) {
+    console.error("Add employee error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+/* ======================================================
+    MASS UPLOAD EMPLOYEES FROM EXCEL/CSV
+====================================================== */
+export const bulkAddEmployees = async (req, res) => {
+  try {
+    // Only main admins can bulk add
+    if (!req.user || req.user.role !== "admin")
+      return res.status(403).json({ message: "Only admins can add employees" });
+
+    if (!req.file)
+      return res.status(400).json({ message: "Excel/CSV file is required" });
+
+    // Read file
+    const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
+    const sheetName = workbook.SheetNames[0];
+    const sheet = workbook.Sheets[sheetName];
+    const data = XLSX.utils.sheet_to_json(sheet);
+
+    const employeesToInsert = [];
+
+    for (let row of data) {
+      const { name, email, contactNo, typeOfEmployee } = row;
+
+      if (!name || !email || !contactNo || !typeOfEmployee) continue;
+
+      // Check if already exists
+      const exists = await Employee.findOne({ email });
+      if (exists) continue;
+
+      const hashedPassword = await bcrypt.hash(contactNo.toString(), 10);
+
+      employeesToInsert.push({
+        name,
+        email,
+        contactNo,
+        typeOfEmployee,
+        password: hashedPassword,
+        createdBy: req.user.id,
+      });
+    }
+
+    if (employeesToInsert.length === 0)
+      return res.status(400).json({ message: "No valid employees to add" });
+
+    const insertedEmployees = await Employee.insertMany(employeesToInsert);
+
+    res.status(201).json({
+      message: `${insertedEmployees.length} employees added successfully`,
+      employees: insertedEmployees,
+    });
+  } catch (error) {
+    console.error("Bulk add employees error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
