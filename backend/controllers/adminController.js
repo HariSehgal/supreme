@@ -1,10 +1,17 @@
-import { Admin, ClientAdmin, ClientUser, Retailer, Campaign ,Employee} from "../models/user.js";
+import {
+  Admin,
+  ClientAdmin,
+  ClientUser,
+  Retailer,
+  Employee,
+  Campaign,
+} from "../models/user.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import XLSX from "xlsx";
 
 /* ======================================================
-    ADMIN LOGIN
+   ADMIN LOGIN
 ====================================================== */
 export const loginAdmin = async (req, res) => {
   try {
@@ -16,10 +23,11 @@ export const loginAdmin = async (req, res) => {
     if (!admin) return res.status(404).json({ message: "Admin not found" });
 
     const isMatch = await bcrypt.compare(password, admin.password);
-    if (!isMatch) return res.status(401).json({ message: "Invalid credentials" });
+    if (!isMatch)
+      return res.status(401).json({ message: "Invalid credentials" });
 
     const token = jwt.sign(
-      { id: admin._id, email: admin.email, role: admin.role || "admin" },
+      { id: admin._id, email: admin.email, role: "admin" },
       process.env.JWT_SECRET || "supremeSecretKey",
       { expiresIn: "1d" }
     );
@@ -36,7 +44,7 @@ export const loginAdmin = async (req, res) => {
 };
 
 /* ======================================================
-    ADD NEW ADMIN (only existing admin can do)
+   ADD NEW ADMIN
 ====================================================== */
 export const addAdmin = async (req, res) => {
   try {
@@ -53,15 +61,11 @@ export const addAdmin = async (req, res) => {
       (await ClientUser.findOne({ email })) ||
       (await Retailer.findOne({ email }));
 
-    if (existing) return res.status(409).json({ message: "Email already exists" });
+    if (existing)
+      return res.status(409).json({ message: "Email already exists" });
 
-    const newAdmin = new Admin({
-      name,
-      email,
-      password,
-      role: "admin",
-      _adminKey: process.env.ADMIN_CREATION_KEY,
-    });
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const newAdmin = new Admin({ name, email, password: hashedPassword });
 
     await newAdmin.save();
     res.status(201).json({ message: "New admin created successfully", admin: newAdmin });
@@ -72,7 +76,7 @@ export const addAdmin = async (req, res) => {
 };
 
 /* ======================================================
-   ADD CLIENT ADMIN (only admins)
+   ADD CLIENT ADMIN
 ====================================================== */
 export const addClientAdmin = async (req, res) => {
   try {
@@ -85,7 +89,8 @@ export const addClientAdmin = async (req, res) => {
       return res.status(400).json({ message: "Missing required fields" });
 
     const existing = await ClientAdmin.findOne({ email });
-    if (existing) return res.status(409).json({ message: "Client admin already exists" });
+    if (existing)
+      return res.status(409).json({ message: "Client admin already exists" });
 
     const hashedPass = await bcrypt.hash(password, 10);
 
@@ -113,11 +118,18 @@ export const addClientAdmin = async (req, res) => {
 };
 
 /* ======================================================
-    ADD CLIENT USER (only admins)
+   ADD CLIENT USER
 ====================================================== */
 export const addClientUser = async (req, res) => {
   try {
-    const { name, email, contactNo, roleProfile, parentClientAdminId, password } = req.body;
+    const {
+      name,
+      email,
+      contactNo,
+      roleProfile,
+      parentClientAdminId,
+      password,
+    } = req.body;
 
     if (!req.user || req.user.role !== "admin")
       return res.status(403).json({ message: "Only admins can add client users" });
@@ -126,7 +138,8 @@ export const addClientUser = async (req, res) => {
       return res.status(400).json({ message: "Missing required fields" });
 
     const existing = await ClientUser.findOne({ email });
-    if (existing) return res.status(409).json({ message: "Client user already exists" });
+    if (existing)
+      return res.status(409).json({ message: "Client user already exists" });
 
     const hashedPass = await bcrypt.hash(password, 10);
 
@@ -140,7 +153,10 @@ export const addClientUser = async (req, res) => {
     });
 
     await newClientUser.save();
-    res.status(201).json({ message: "Client user created successfully", clientUser: newClientUser });
+    res.status(201).json({
+      message: "Client user created successfully",
+      clientUser: newClientUser,
+    });
   } catch (error) {
     console.error("Add client user error:", error);
     res.status(500).json({ message: "Server error" });
@@ -148,7 +164,7 @@ export const addClientUser = async (req, res) => {
 };
 
 /* ======================================================
-    CLIENT ADMIN LOGIN
+   CLIENT ADMIN LOGIN
 ====================================================== */
 export const loginClientAdmin = async (req, res) => {
   try {
@@ -157,10 +173,12 @@ export const loginClientAdmin = async (req, res) => {
       return res.status(400).json({ message: "Email and password required" });
 
     const clientAdmin = await ClientAdmin.findOne({ email });
-    if (!clientAdmin) return res.status(404).json({ message: "Client admin not found" });
+    if (!clientAdmin)
+      return res.status(404).json({ message: "Client admin not found" });
 
     const isMatch = await bcrypt.compare(password, clientAdmin.password);
-    if (!isMatch) return res.status(401).json({ message: "Invalid credentials" });
+    if (!isMatch)
+      return res.status(401).json({ message: "Invalid credentials" });
 
     const token = jwt.sign(
       { id: clientAdmin._id, email: clientAdmin.email, role: "client-admin" },
@@ -185,7 +203,7 @@ export const loginClientAdmin = async (req, res) => {
 };
 
 /* ======================================================
-    PROTECT MIDDLEWARE
+   PROTECT MIDDLEWARE
 ====================================================== */
 export const protect = (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -205,13 +223,17 @@ export const protect = (req, res, next) => {
 };
 
 /* ======================================================
-    CAMPAIGN MANAGEMENT (only admins)
+   CAMPAIGN MANAGEMENT
 ====================================================== */
-
-// Add new campaign
 export const addCampaign = async (req, res) => {
   try {
-    const { name, client, type, region, state } = req.body;
+    const {
+      name,
+      client,
+      type,
+      region,
+      state,
+    } = req.body;
 
     if (!req.user || req.user.role !== "admin")
       return res.status(403).json({ message: "Only admins can create campaigns" });
@@ -236,10 +258,13 @@ export const addCampaign = async (req, res) => {
   }
 };
 
-// Get all campaigns
 export const getAllCampaigns = async (req, res) => {
   try {
-    const campaigns = await Campaign.find().populate("createdBy", "name email");
+    const campaigns = await Campaign.find()
+      .populate("createdBy", "name email")
+      .populate("assignedEmployees", "name email")
+      .populate("assignedRetailers", "name contactNo");
+
     res.status(200).json({ campaigns });
   } catch (error) {
     console.error("Get campaigns error:", error);
@@ -247,7 +272,6 @@ export const getAllCampaigns = async (req, res) => {
   }
 };
 
-// Delete a campaign
 export const deleteCampaign = async (req, res) => {
   try {
     const { id } = req.params;
@@ -256,7 +280,8 @@ export const deleteCampaign = async (req, res) => {
       return res.status(403).json({ message: "Only admins can delete campaigns" });
 
     const campaign = await Campaign.findByIdAndDelete(id);
-    if (!campaign) return res.status(404).json({ message: "Campaign not found" });
+    if (!campaign)
+      return res.status(404).json({ message: "Campaign not found" });
 
     res.status(200).json({ message: "Campaign deleted successfully" });
   } catch (error) {
@@ -264,25 +289,32 @@ export const deleteCampaign = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
+/* ======================================================
+   EMPLOYEE MANAGEMENT
+====================================================== */
 export const addEmployee = async (req, res) => {
   try {
-    const { name, email, contactNo, typeOfEmployee } = req.body;
+    const { name, email, contactNo, gender, address, dob } = req.body;
 
     if (!req.user || req.user.role !== "admin")
       return res.status(403).json({ message: "Only admins can add employees" });
 
-    if (!name || !email || !contactNo || !typeOfEmployee)
+    if (!name || !email || !contactNo)
       return res.status(400).json({ message: "All fields are required" });
 
     const existing = await Employee.findOne({ email });
-    if (existing) return res.status(409).json({ message: "Employee already exists" });
+    if (existing)
+      return res.status(409).json({ message: "Employee already exists" });
 
     const newEmployee = new Employee({
       name,
       email,
       phone: contactNo,
-      typeOfEmployee,
-      createdBy: req.user.id,
+      gender,
+      address,
+      dob,
+      organization: req.user.id,
     });
 
     await newEmployee.save();
@@ -294,31 +326,26 @@ export const addEmployee = async (req, res) => {
 };
 
 /* ======================================================
-    MASS UPLOAD EMPLOYEES FROM EXCEL/CSV
+   BULK ADD EMPLOYEES FROM EXCEL
 ====================================================== */
 export const bulkAddEmployees = async (req, res) => {
   try {
-    // Only main admins can bulk add
     if (!req.user || req.user.role !== "admin")
       return res.status(403).json({ message: "Only admins can add employees" });
 
     if (!req.file)
       return res.status(400).json({ message: "Excel/CSV file is required" });
 
-    // Read file
     const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
-    const sheetName = workbook.SheetNames[0];
-    const sheet = workbook.Sheets[sheetName];
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
     const data = XLSX.utils.sheet_to_json(sheet);
 
     const employeesToInsert = [];
 
     for (let row of data) {
-      const { name, email, contactNo, typeOfEmployee } = row;
+      const { name, email, contactNo, gender, address } = row;
+      if (!name || !email || !contactNo) continue;
 
-      if (!name || !email || !contactNo || !typeOfEmployee) continue;
-
-      // Check if already exists
       const exists = await Employee.findOne({ email });
       if (exists) continue;
 
@@ -327,10 +354,11 @@ export const bulkAddEmployees = async (req, res) => {
       employeesToInsert.push({
         name,
         email,
-        contactNo,
-        typeOfEmployee,
+        phone: contactNo,
+        gender,
+        address,
         password: hashedPassword,
-        createdBy: req.user.id,
+        organization: req.user.id,
       });
     }
 
@@ -345,6 +373,140 @@ export const bulkAddEmployees = async (req, res) => {
     });
   } catch (error) {
     console.error("Bulk add employees error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+/* ======================================================
+   ASSIGN CAMPAIGN TO EMPLOYEES & RETAILERS
+====================================================== */
+export const assignCampaign = async (req, res) => {
+  try {
+    const { campaignId, employeeIds = [], retailerIds = [] } = req.body;
+
+    // Ensure only admins can assign campaigns
+    if (!req.user || req.user.role !== "admin")
+      return res.status(403).json({ message: "Only admins can assign campaigns" });
+
+    if (!campaignId)
+      return res.status(400).json({ message: "Campaign ID is required" });
+
+    const campaign = await Campaign.findById(campaignId);
+    if (!campaign) return res.status(404).json({ message: "Campaign not found" });
+
+    // Initialize arrays if undefined
+    campaign.assignedEmployees = campaign.assignedEmployees || [];
+    campaign.assignedRetailers = campaign.assignedRetailers || [];
+
+    // ======================
+    // Assign Employees
+    // ======================
+    for (const empId of employeeIds) {
+      if (!empId) continue;
+
+      // Check if already assigned (works for both objects and plain ObjectIds)
+      const existingIndex = campaign.assignedEmployees.findIndex(e => {
+        const id = e.employeeId ? e.employeeId : e;
+        return id.toString() === empId.toString();
+      });
+
+      if (existingIndex === -1) {
+        // Not assigned yet — add as object with default status
+        campaign.assignedEmployees.push({
+          employeeId: empId,
+          status: "pending",
+          assignedAt: new Date(),
+          updatedAt: new Date(),
+        });
+      } else {
+        // Already assigned but may be a plain ObjectId — normalize
+        const entry = campaign.assignedEmployees[existingIndex];
+        if (!entry.employeeId) {
+          campaign.assignedEmployees[existingIndex] = {
+            employeeId: entry,
+            status: "pending",
+            assignedAt: new Date(),
+            updatedAt: new Date(),
+          };
+        }
+      }
+
+      // Link campaign in Employee model
+      await Employee.findByIdAndUpdate(empId, {
+        $addToSet: { assignedCampaigns: campaign._id },
+      });
+    }
+
+    // ======================
+    // Assign Retailers
+    // ======================
+    for (const retId of retailerIds) {
+      if (!retId) continue;
+
+      const existingIndex = campaign.assignedRetailers.findIndex(r => {
+        const id = r.retailerId ? r.retailerId : r;
+        return id.toString() === retId.toString();
+      });
+
+      if (existingIndex === -1) {
+        campaign.assignedRetailers.push({
+          retailerId: retId,
+          status: "pending",
+          assignedAt: new Date(),
+          updatedAt: new Date(),
+        });
+      } else {
+        const entry = campaign.assignedRetailers[existingIndex];
+        if (!entry.retailerId) {
+          campaign.assignedRetailers[existingIndex] = {
+            retailerId: entry,
+            status: "pending",
+            assignedAt: new Date(),
+            updatedAt: new Date(),
+          };
+        }
+      }
+
+      await Retailer.findByIdAndUpdate(retId, {
+        $addToSet: { assignedCampaigns: campaign._id },
+      });
+    }
+
+    await campaign.save();
+
+    res.status(200).json({
+      message: "Campaign assigned successfully",
+      campaign,
+    });
+  } catch (error) {
+    console.error("Assign campaign error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+
+/* ======================================================
+   FETCH ALL EMPLOYEES
+====================================================== */
+export const getAllEmployees = async (req, res) => {
+  try {
+    const employees = await Employee.find().select("_id name email");
+    res.status(200).json({ employees });
+  } catch (err) {
+    console.error("Get employees error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+/* ======================================================
+   FETCH ALL RETAILERS
+====================================================== */
+export const getAllRetailers = async (req, res) => {
+  try {
+    const retailers = await Retailer.find().select("_id name contactNo");
+    res.status(200).json({ retailers });
+  } catch (err) {
+    console.error("Get retailers error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };

@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 
-const { Schema, model } = mongoose;
+const { Schema, model  ,Types } = mongoose;
 
 /* ===============================
    STATE CODE MAP
@@ -114,31 +114,25 @@ const retailerSchema = new Schema(
     personPhoto: { data: Buffer, contentType: String },
     registrationForm: { data: Buffer, contentType: String },
     shopDetails: {
-      type: {
-        shopName: String,
-        businessType: String,
-        ownershipType: String,
-        GSTNo: String,
-        PANCard: String,
-        outletPhoto: { data: Buffer, contentType: String },
-        shopAddress: {
-          address: String,
-          address2: String,
-          city: String,
-          state: String,
-          pincode: String,
-        },
+      shopName: String,
+      businessType: String,
+      ownershipType: String,
+      GSTNo: String,
+      PANCard: String,
+      outletPhoto: { data: Buffer, contentType: String },
+      shopAddress: {
+        address: String,
+        address2: String,
+        city: String,
+        state: String,
+        pincode: String,
       },
-      default: {},
     },
     bankDetails: {
-      type: {
-        bankName: String,
-        accountNumber: String,
-        IFSC: String,
-        branchName: String,
-      },
-      default: {},
+      bankName: String,
+      accountNumber: String,
+      IFSC: String,
+      branchName: String,
     },
     createdBy: {
       type: String,
@@ -146,13 +140,21 @@ const retailerSchema = new Schema(
       default: "RetailerSelf",
     },
     phoneVerified: { type: Boolean, default: false },
+    assignedCampaigns: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "Campaign",
+      },
+    ],
+    assignedEmployee: {
+      type: Schema.Types.ObjectId,
+      ref: "Employee",
+    },
   },
   { timestamps: true }
 );
 
-/* ===============================
-   AUTO-GENERATE CODES + PASSWORD
-=============================== */
+// Hash password and generate uniqueId & retailerCode
 retailerSchema.pre("save", async function (next) {
   try {
     if (!this.password && this.contactNo) {
@@ -183,30 +185,33 @@ retailerSchema.pre("save", async function (next) {
     next(err);
   }
 });
-
 export const Retailer = model("Retailer", retailerSchema);
 
 /* ===============================
-   EMPLOYEE SCHEMA (UPDATED)
+   EMPLOYEE SCHEMA
 =============================== */
 const employeeSchema = new Schema(
   {
     name: { type: String, required: true },
     email: { type: String, required: true, unique: true },
     phone: { type: String, required: true },
-    password: { type: String }, // <- remove required: true
+    password: { type: String },
     gender: String,
     address: String,
     dob: Date,
     organization: { type: Schema.Types.ObjectId, ref: "ClientAdmin" },
+    createdByAdmin: { type: Schema.Types.ObjectId, ref: "Admin" },
     isFirstLogin: { type: Boolean, default: true },
+    assignedCampaigns: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "Campaign",
+      },
+    ],
   },
   { timestamps: true }
 );
 
-/* ===============================
-   AUTO-HASH PHONE AS INITIAL PASSWORD
-=============================== */
 employeeSchema.pre("save", async function (next) {
   try {
     if (this.isNew && this.phone) {
@@ -218,7 +223,6 @@ employeeSchema.pre("save", async function (next) {
     next(err);
   }
 });
-
 export const Employee = model("Employee", employeeSchema);
 
 /* ===============================
@@ -230,21 +234,32 @@ const campaignSchema = new Schema(
     client: { type: String, required: true, trim: true },
     type: {
       type: String,
-      enum: [
-        "Retailer Enrolment",
-        "Display Payment",
-        "Incentive Payment",
-        "Others",
-      ],
+      enum: ["Retailer Enrolment", "Display Payment", "Incentive Payment", "Others"],
       required: true,
     },
-    region: {
-      type: String,
-      enum: ["North", "South", "East", "West", "All"],
-      required: true,
-    },
+    region: { type: String, enum: ["North", "South", "East", "West", "All"], required: true },
     state: { type: String, required: true },
-    createdBy: { type: Schema.Types.ObjectId, ref: "Admin", required: true },
+    createdBy: { type: Types.ObjectId, ref: "Admin", required: true },
+
+    // Assigned Retailers
+    assignedRetailers: [
+      {
+        retailerId: { type: Types.ObjectId, ref: "Retailer", required: true },
+        status: { type: String, enum: ["pending", "accepted", "rejected"], default: "pending" },
+        assignedAt: { type: Date, default: Date.now },
+        updatedAt: { type: Date },
+      },
+    ],
+
+    // Assigned Employees
+    assignedEmployees: [
+      {
+        employeeId: { type: Types.ObjectId, ref: "Employee" },
+        status: { type: String, enum: ["pending", "accepted", "rejected"], default: "pending" },
+        assignedAt: { type: Date, default: Date.now },
+        updatedAt: { type: Date },
+      },
+    ],
   },
   { timestamps: true }
 );

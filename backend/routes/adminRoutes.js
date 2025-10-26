@@ -12,7 +12,10 @@ import {
   deleteCampaign,
   addEmployee,
   bulkAddEmployees,
+  assignCampaign, // new controller
 } from "../controllers/adminController.js";
+
+import { getAllEmployees, getAllRetailers } from "../controllers/adminController.js";
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -59,4 +62,8 @@ router.get("/campaigns", protect, getAllCampaigns);
 // Delete a campaign by ID
 router.delete("/campaign/:id", protect, deleteCampaign);
 
+// Assign campaign to employees and retailers
+router.post("/campaign/assign", protect, assignCampaign);
+router.get("/employees", protect, getAllEmployees);   // for dropdown
+router.get("/retailers", protect, getAllRetailers);   // for dropdown
 export default router;

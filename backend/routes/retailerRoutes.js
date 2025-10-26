@@ -5,18 +5,15 @@ import {
   registerRetailer,
   loginRetailer,
   getRetailerProfile,
-  getAllCampaigns,
+  getRetailerCampaigns,
+  updateCampaignStatus, // ✅ newly added controller
 } from "../controllers/retailerController.js";
 import multer from "multer";
 import { protect } from "../middleware/authMiddleware.js"; // JWT middleware
 
-// ===============================
-// Multer Setup
-// ===============================
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
-// Fields that can be uploaded
 const uploadFiles = upload.fields([
   { name: "govtIdPhoto", maxCount: 1 },
   { name: "personPhoto", maxCount: 1 },
@@ -27,30 +24,21 @@ const uploadFiles = upload.fields([
 
 const router = express.Router();
 
-// ===============================
-// RETAILER AUTH ROUTES
-// ===============================
-
-// Send OTP to phone
+// -------------------------------
+// AUTH
 router.post("/send-otp", sendOtp);
-
-// Verify OTP
 router.post("/verify-otp", verifyOtp);
-
-// Register retailer (with Multer to handle files)
 router.post("/register", uploadFiles, registerRetailer);
-
-// Login retailer
 router.post("/login", loginRetailer);
 
-// ===============================
+// -------------------------------
 // PROTECTED ROUTES
-// ===============================
-
-// Get retailer profile by ID (JWT protected)
 router.get("/profile/:id", protect, getRetailerProfile);
 
-// Get all campaigns available to retailers (JWT protected)
-router.get("/campaigns", protect, getAllCampaigns);
+// Fetch only campaigns assigned to this retailer
+router.get("/campaigns", protect, getRetailerCampaigns);
+
+// ✅ Retailer accepts or rejects a campaign
+router.put("/campaigns/:campaignId/status", protect, updateCampaignStatus);
 
 export default router;

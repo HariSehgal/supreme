@@ -67,7 +67,7 @@ export const verifyOtp = async (req, res) => {
 };
 
 /* ===============================
-   REGISTER RETAILER (with phone OTP)
+   REGISTER RETAILER
 =============================== */
 export const registerRetailer = async (req, res) => {
   try {
@@ -78,9 +78,11 @@ export const registerRetailer = async (req, res) => {
     if (!email || !contactNo)
       return res.status(400).json({ message: "Email and contact number are required" });
 
-    // Must have verified OTP before registration
+    // Must verify OTP before registration
     if (otpStore.has(contactNo)) {
-      return res.status(400).json({ message: "Please verify your phone number before registration" });
+      return res
+        .status(400)
+        .json({ message: "Please verify your phone number before registration" });
     }
 
     const personalAddress = {
@@ -172,12 +174,10 @@ export const registerRetailer = async (req, res) => {
 export const loginRetailer = async (req, res) => {
   try {
     const { contactNo } = req.body;
-    if (!contactNo)
-      return res.status(400).json({ message: "Phone number required" });
+    if (!contactNo) return res.status(400).json({ message: "Phone number required" });
 
     const retailer = await Retailer.findOne({ contactNo });
-    if (!retailer)
-      return res.status(400).json({ message: "Retailer not found" });
+    if (!retailer) return res.status(400).json({ message: "Retailer not found" });
     if (!retailer.phoneVerified)
       return res.status(400).json({ message: "Phone not verified" });
 
@@ -211,8 +211,7 @@ export const getRetailerProfile = async (req, res) => {
   try {
     const { id } = req.params;
     const retailer = await Retailer.findById(id).select("-password");
-    if (!retailer)
-      return res.status(404).json({ message: "Retailer not found" });
+    if (!retailer) return res.status(404).json({ message: "Retailer not found" });
 
     res.status(200).json(retailer);
   } catch (error) {
@@ -222,49 +221,80 @@ export const getRetailerProfile = async (req, res) => {
 };
 
 /* ===============================
-   GET ALL CAMPAIGNS (JWT Protected)
+   GET CAMPAIGNS ASSIGNED TO RETAILER
 =============================== */
-export const getAllCampaigns = async (req, res) => {
+export const getRetailerCampaigns = async (req, res) => {
   try {
-    // Extract retailer from JWT
     const token = req.headers.authorization?.split(" ")[1];
     if (!token) return res.status(401).json({ message: "Unauthorized: No token" });
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || "supremeSecretKey");
-    const retailer = await Retailer.findById(decoded.id);
-
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const retailer = await Retailer.findById(decoded.id).populate("assignedCampaigns");
     if (!retailer) return res.status(404).json({ message: "Retailer not found" });
-
-    const retailerState = retailer.shopDetails?.shopAddress?.state || "";
-    const partOfIndia = retailer.partOfIndia || "N";
-
-    // Region mapping
-    const regionMap = {
-      N: "North",
-      S: "South",
-      E: "East",
-      W: "West",
-    };
-
-    const retailerRegion = regionMap[partOfIndia] || "North";
-
-    // Fetch campaigns that match retailer region or state or are open to all
-    const campaigns = await Campaign.find({
-      $or: [
-        { region: "All" },
-        { region: retailerRegion },
-        { state: retailerState },
-      ],
-    }).sort({ createdAt: -1 });
 
     res.status(200).json({
       message: "Campaigns fetched successfully",
-      region: retailerRegion,
-      state: retailerState,
-      campaigns,
+      retailer: {
+        id: retailer._id,
+        name: retailer.name,
+        uniqueId: retailer.uniqueId,
+      },
+      campaigns: retailer.assignedCampaigns, // already populated
     });
   } catch (error) {
-    console.error("Get campaigns error:", error);
+    console.error("Get retailer campaigns error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+
+/* ===============================
+   ACCEPT OR REJECT A CAMPAIGN
+=============================== */
+
+export const updateCampaignStatus = async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) return res.status(401).json({ message: "Unauthorized: No token" });
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const retailerId = decoded.id;
+    const { campaignId } = req.params;
+    let { status } = req.body;
+
+    if (!status) return res.status(400).json({ message: "Status is required" });
+
+    status = status.toString().trim().toLowerCase();
+    if (!["accepted", "rejected"].includes(status))
+      return res.status(400).json({ message: "Invalid status value" });
+
+    const campaign = await Campaign.findById(campaignId);
+    if (!campaign) return res.status(404).json({ message: "Campaign not found" });
+
+    if (!Array.isArray(campaign.assignedRetailers) || campaign.assignedRetailers.length === 0)
+      return res.status(400).json({ message: "No retailers assigned to this campaign" });
+
+    // Find the retailer entry
+    const retailerEntry = campaign.assignedRetailers.find(
+      r => r.retailerId?.toString() === retailerId.toString()
+    );
+
+    if (!retailerEntry)
+      return res.status(403).json({ message: "You are not assigned to this campaign" });
+
+    // Update status and timestamp
+    retailerEntry.status = status;
+    retailerEntry.updatedAt = new Date();
+
+    await campaign.save();
+
+    res.status(200).json({
+      message: `Campaign ${status} successfully`,
+      campaignId,
+      retailerStatus: status,
+    });
+  } catch (error) {
+    console.error("Update campaign status error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };

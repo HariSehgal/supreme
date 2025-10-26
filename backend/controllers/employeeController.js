@@ -1,43 +1,112 @@
-import { Employee } from "../models/user.js";
-import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import { Employee, Campaign } from "../models/user.js";
 
-/* ======================================================
-   EMPLOYEE LOGIN
-====================================================== */
+/* ===============================
+   LOGIN EMPLOYEE
+=============================== */
 export const loginEmployee = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, phone } = req.body;
 
-    if (!email || !password)
-      return res.status(400).json({ message: "Email and password are required" });
+    const employee = await Employee.findOne({
+      $or: [{ email }, { phone }],
+    });
 
-    const employee = await Employee.findOne({ email });
-    if (!employee)
+    if (!employee) {
       return res.status(404).json({ message: "Employee not found" });
-
-    const isMatch = await bcrypt.compare(password, employee.password);
-    if (!isMatch)
-      return res.status(401).json({ message: "Invalid credentials" });
+    }
 
     const token = jwt.sign(
-      { id: employee._id, email: employee.email, role: "employee" },
+      { id: employee._id, role: "employee" },
       process.env.JWT_SECRET || "supremeSecretKey",
-      { expiresIn: "1d" }
+      { expiresIn: "7d" }
     );
 
     res.status(200).json({
-      message: "Employee login successful",
+      message: "Login successful",
       token,
       employee: {
         id: employee._id,
         name: employee.name,
         email: employee.email,
-        typeOfEmployee: employee.typeOfEmployee,
+        phone: employee.phone,
       },
     });
   } catch (error) {
     console.error("Employee login error:", error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+/* ===============================
+   GET EMPLOYEE CAMPAIGNS
+=============================== */
+export const getEmployeeCampaigns = async (req, res) => {
+  try {
+    const employee = await Employee.findById(req.user.id);
+    if (!employee) return res.status(404).json({ message: "Employee not found" });
+
+    const campaigns = await Campaign.find({
+      "assignedEmployees.employeeId": employee._id,
+    }).sort({ createdAt: -1 });
+
+    res.status(200).json({
+      message: "Campaigns fetched successfully",
+      employee: {
+        id: employee._id,
+        name: employee.name,
+        email: employee.email,
+      },
+      campaigns,
+    });
+  } catch (error) {
+    console.error("Get employee campaigns error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+/* ===============================
+   UPDATE CAMPAIGN STATUS
+=============================== */
+export const updateCampaignStatus = async (req, res) => {
+  try {
+    const employeeId = req.user.id;
+    const { campaignId } = req.params;
+    const { status } = req.body;
+
+    if (!["accepted", "rejected"].includes(status)) {
+      return res.status(400).json({ message: "Invalid status value" });
+    }
+
+    const campaign = await Campaign.findOne({
+      _id: campaignId,
+      "assignedEmployees.employeeId": employeeId,
+    });
+
+    if (!campaign) {
+      return res.status(404).json({ message: "Campaign not found or not assigned to this employee" });
+    }
+
+    const employeeEntry = campaign.assignedEmployees.find(
+      (e) => e.employeeId.toString() === employeeId
+    );
+
+    if (!employeeEntry) {
+      return res.status(404).json({ message: "Employee not assigned to this campaign" });
+    }
+
+    employeeEntry.status = status;
+    employeeEntry.updatedAt = new Date();
+
+    await campaign.save();
+
+    res.status(200).json({
+      message: `Campaign ${status} successfully`,
+      campaignId,
+      employeeStatus: employeeEntry.status,
+    });
+  } catch (error) {
+    console.error("Update campaign status error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
