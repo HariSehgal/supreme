@@ -263,5 +263,171 @@ const campaignSchema = new Schema(
   },
   { timestamps: true }
 );
+const paymentSchema = new mongoose.Schema(
+  {
+    retailer: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Retailer",
+      required: true,
+    },
+    campaign: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Campaign",
+      required: true,
+    },
+    totalAmount: {
+      type: Number,
+      required: true,
+    },
+    amountPaid: {
+      type: Number,
+      default: 0,
+    },
+    remainingAmount: {
+      type: Number,
+      default: function () {
+        return this.totalAmount - this.amountPaid;
+      },
+    },
+    // Track all UTR numbers as an array
+    utrNumbers: [
+      {
+        utrNumber: { type: String, required: true },
+        amount: { type: Number, required: true },
+        date: { type: Date, default: Date.now },
+        updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "Admin" }, // or ClientAdmin
+      },
+    ],
+    paymentStatus: {
+      type: String,
+      enum: ["Pending", "Partially Paid", "Completed"],
+      default: "Pending",
+    },
+    lastUpdatedByAdmin: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Admin", // admin who last updated
+    },
+  },
+  { timestamps: true }
+);
 
+/* ===============================
+   CAREER APPLICATION SCHEMA (UPDATED)
+=============================== */
+/* ===============================
+   CAREER APPLICATION SCHEMA (Candidate)
+=============================== */
+const careerApplicationSchema = new mongoose.Schema(
+  {
+    fullName: { type: String, required: true },
+    phoneNumber: { type: String, required: true },
+    email: { type: String, required: true, unique: true },
+    password: { type: String, required: true },
+
+    resume: {
+      data: Buffer,
+      contentType: {
+        type: String,
+        enum: [
+          "application/msword",
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "image/png",
+          "image/jpeg",
+        ],
+      },
+    },
+  },
+  { timestamps: true }
+);
+
+// Password encryption
+careerApplicationSchema.pre("save", async function (next) {
+  if (!this.isModified("password")) return next();
+  const salt = await bcrypt.genSalt(10);
+  this.password = await bcrypt.hash(this.password, salt);
+  next();
+});
+
+careerApplicationSchema.methods.comparePassword = async function (enteredPassword) {
+  return await bcrypt.compare(enteredPassword, this.password);
+};
+
+export const CareerApplication = mongoose.model("CareerApplication", careerApplicationSchema);
+
+
+/* ===============================
+   JOB SCHEMA
+=============================== */
+const jobSchema = new mongoose.Schema(
+  {
+    title: { type: String, required: true },
+    description: { type: String, required: true },
+    location: { type: String, required: true },
+    salaryRange: { type: String },
+    experienceRequired: { type: String },
+    employmentType: {
+      type: String,
+      enum: ["Full-Time", "Part-Time", "Internship", "Contract"],
+      default: "Full-Time",
+    },
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Admin",
+      required: true,
+    },
+    isActive: { type: Boolean, default: true },
+  },
+  { timestamps: true }
+);
+
+export const Job = mongoose.model("Job", jobSchema);
+
+
+/* ===============================
+   JOB APPLICATION SCHEMA (Tracks each job application)
+=============================== */
+const jobApplicationSchema = new mongoose.Schema(
+  {
+    candidate: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "CareerApplication",
+      required: true,
+    },
+    job: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Job",
+      required: true,
+    },
+
+    // Application progress tracking
+    totalRounds: { type: Number, default: 1 }, // set by admin
+    currentRound: { type: Number, default: 0 },
+    status: {
+      type: String,
+      enum: [
+        "Pending",
+        "In Review",
+        "Interview Scheduled",
+        "Shortlisted",
+        "Selected",
+        "Rejected",
+      ],
+      default: "Pending",
+    },
+
+    appliedAt: { type: Date, default: Date.now },
+    lastUpdated: { type: Date, default: Date.now },
+  },
+  { timestamps: true }
+);
+
+export const JobApplication = mongoose.model("JobApplication", jobApplicationSchema);
+
+export default mongoose.model("Payment", paymentSchema);
+
+
+export const Payment = mongoose.model("Payment", paymentSchema);
 export const Campaign = model("Campaign", campaignSchema);
+
+
+

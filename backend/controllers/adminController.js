@@ -5,11 +5,13 @@ import {
   Retailer,
   Employee,
   Campaign,
+  Payment 
+
 } from "../models/user.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import XLSX from "xlsx";
-
+import { CareerApplication,Job, JobApplication } from "../models/user.js";
 /* ======================================================
    ADMIN LOGIN
 ====================================================== */
@@ -467,9 +469,26 @@ export const assignCampaign = async (req, res) => {
         }
       }
 
+      // Link campaign in Retailer model
       await Retailer.findByIdAndUpdate(retId, {
         $addToSet: { assignedCampaigns: campaign._id },
       });
+
+      // ===== Create Payment document if not exists =====
+      const existingPayment = await Payment.findOne({
+        campaign: campaign._id,
+        retailer: retId,
+      });
+
+      if (!existingPayment) {
+        await Payment.create({
+          campaign: campaign._id,
+          retailer: retId,
+          totalAmount: 0,      // default total amount (can be updated later)
+          amountPaid: 0,
+          paymentStatus: "Pending",
+        });
+      }
     }
 
     await campaign.save();
@@ -483,7 +502,6 @@ export const assignCampaign = async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
-
 
 /* ======================================================
    FETCH ALL EMPLOYEES
@@ -508,5 +526,226 @@ export const getAllRetailers = async (req, res) => {
   } catch (err) {
     console.error("Get retailers error:", err);
     res.status(500).json({ message: "Server error" });
+  }
+};
+/* ======================================================
+   ADMIN UPDATES PAYMENT PROGRESS & UTR
+====================================================== */
+export const updateCampaignPayment = async (req, res) => {
+  try {
+    const { campaignId, retailerId, amountPaid, utrNumber } = req.body;
+
+    if (!req.user || req.user.role !== "admin")
+      return res.status(403).json({ message: "Only admins can update payments" });
+
+    const campaign = await Campaign.findById(campaignId);
+    if (!campaign) return res.status(404).json({ message: "Campaign not found" });
+
+    const assignedRetailer = campaign.assignedRetailers.find(
+      (r) => r.retailerId.toString() === retailerId.toString()
+    );
+
+    if (!assignedRetailer || assignedRetailer.status !== "accepted")
+      return res.status(400).json({
+        message: "Retailer has not accepted this campaign yet",
+      });
+
+    const payment = await Payment.findOne({ campaign: campaignId, retailer: retailerId });
+    if (!payment) return res.status(404).json({ message: "Payment plan not found" });
+
+    // Update amountPaid
+    if (amountPaid !== undefined) {
+      payment.amountPaid += amountPaid; // add the new payment
+    }
+
+    // Track UTR numbers as an array
+    if (utrNumber) {
+      payment.utrNumbers = payment.utrNumbers || [];
+      payment.utrNumbers.push({
+        utrNumber,
+        amount: amountPaid || 0,
+        date: new Date(),
+        updatedBy: req.user._id,
+      });
+    }
+
+    // Update remaining amount
+    payment.remainingAmount = payment.totalAmount - payment.amountPaid;
+    payment.lastUpdatedByAdmin = req.user._id;
+
+    // Update payment status
+    if (payment.amountPaid === 0) {
+      payment.paymentStatus = "Pending";
+    } else if (payment.amountPaid < payment.totalAmount) {
+      payment.paymentStatus = "Partially Paid";
+    } else {
+      payment.paymentStatus = "Completed";
+    }
+
+    await payment.save();
+
+    res.status(200).json({
+      message: "Payment updated successfully",
+      payment,
+    });
+  } catch (error) {
+    console.error("Error updating campaign payment:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+/* ======================================================
+   ADMIN FETCHES ALL PAYMENTS FOR A CAMPAIGN
+====================================================== */
+export const getCampaignPayments = async (req, res) => {
+  try {
+    const { campaignId } = req.params;
+    const payments = await Payment.find({ campaign: campaignId })
+      .populate("retailer", "name email")
+      .populate("createdByClient", "name")
+      .populate("lastUpdatedByAdmin", "name")
+      .sort({ updatedAt: -1 });
+
+    res.status(200).json({ payments });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+/* ======================================================
+   CREATE JOB POSTING (admin)
+   POST /admin/career/jobs
+   body: { title, description, location, salaryRange?, experienceRequired?, employmentType?, totalRounds? }
+====================================================== */
+export const createJobPosting = async (req, res) => {
+  try {
+    if (!req.user || req.user.role !== "admin")
+      return res.status(403).json({ message: "Only admins can create job postings" });
+
+    const { title, description, location, salaryRange, experienceRequired, employmentType, totalRounds } = req.body;
+    if (!title || !description || !location)
+      return res.status(400).json({ message: "title, description and location are required" });
+
+    const job = new Job({
+      title,
+      description,
+      location,
+      salaryRange,
+      experienceRequired,
+      employmentType,
+      totalRounds: totalRounds || 1,
+      createdBy: req.user.id,
+      isActive: true,
+    });
+
+    await job.save();
+    res.status(201).json({ message: "Job created successfully", job });
+  } catch (error) {
+    console.error("Create job posting error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+/* ======================================================
+   Get jobs created by admin
+   GET /admin/career/jobs
+====================================================== */
+export const getAdminJobs = async (req, res) => {
+  try {
+    if (!req.user || req.user.role !== "admin")
+      return res.status(403).json({ message: "Only admins can view their jobs" });
+
+    const jobs = await Job.find({ createdBy: req.user.id }).sort({ createdAt: -1 });
+    res.status(200).json({ jobs });
+  } catch (error) {
+    console.error("Get admin jobs error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+/* ======================================================
+   Get applications for a specific job (admin)
+   GET /admin/career/jobs/:jobId/applications
+====================================================== */
+export const getJobApplications = async (req, res) => {
+  try {
+    if (!req.user || req.user.role !== "admin")
+      return res.status(403).json({ message: "Only admins can view applications" });
+
+    const { jobId } = req.params;
+    const job = await Job.findById(jobId);
+    if (!job) return res.status(404).json({ message: "Job not found" });
+    if (job.createdBy.toString() !== req.user.id)
+      return res.status(403).json({ message: "Not authorized to view applications for this job" });
+
+    const applications = await JobApplication.find({ job: jobId })
+      .populate("candidate", "fullName email phoneNumber")
+      .sort({ appliedAt: -1 });
+
+    res.status(200).json({ applications });
+  } catch (error) {
+    console.error("Get job applications error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+/* ======================================================
+   Update application status / round (admin)
+   PUT /admin/career/applications/:applicationId
+   body: { status?, currentRound? }
+====================================================== */
+export const updateCandidateStatus = async (req, res) => {
+  try {
+    const { id } = req.params; // ✅ matches route
+    const { status, currentRound } = req.body;
+
+    const application = await JobApplication.findById(id);
+    if (!application)
+      return res.status(404).json({ message: "Application not found" });
+
+    if (status) application.status = status;
+    if (currentRound !== undefined) application.currentRound = currentRound;
+    application.lastUpdated = new Date();
+
+    await application.save();
+
+    res.status(200).json({
+      message: "Application status updated successfully",
+      application,
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+
+/* ======================================================
+   Admin download candidate resume
+   GET /admin/career/applications/:applicationId/resume
+====================================================== */
+export const getCandidateResume = async (req, res) => {
+  try {
+    if (!req.user || req.user.role !== "admin")
+      return res.status(403).json({ message: "Only admins can access resumes" });
+
+    const { applicationId } = req.params;
+    const application = await JobApplication.findById(applicationId).populate("candidate");
+    if (!application) return res.status(404).json({ message: "Application not found" });
+
+    const candidate = application.candidate;
+    if (!candidate || !candidate.resume || !candidate.resume.data)
+      return res.status(404).json({ message: "Resume not uploaded or unavailable" });
+
+    const ext = candidate.resume.contentType.split("/")[1] || "bin";
+    const filename = `${candidate.fullName.replace(/\s+/g, "_")}_Resume.${ext}`;
+
+    res.set({
+      "Content-Type": candidate.resume.contentType,
+      "Content-Disposition": `attachment; filename="${filename}"`,
+    });
+
+    return res.send(candidate.resume.data);
+  } catch (error) {
+    console.error("Error fetching candidate resume:", error);
+    return res.status(500).json({ message: "Server error" });
   }
 };

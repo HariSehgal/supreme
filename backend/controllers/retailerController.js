@@ -298,3 +298,37 @@ export const updateCampaignStatus = async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+/* ===============================
+   RETAILER: VIEW PAYMENT STATUS
+=============================== */
+export const getRetailerCampaignPayments = async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) return res.status(401).json({ message: "Unauthorized: No token" });
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const retailerId = decoded.id;
+
+    const payments = await Payment.find({ retailer: retailerId }).populate("campaign", "name _id");
+
+    if (!payments || payments.length === 0)
+      return res.status(404).json({ message: "No payments found" });
+
+    const formatted = payments.map((p) => ({
+      campaignId: p.campaign._id,
+      campaignName: p.campaign.name,
+      totalAmount: p.totalAmount,
+      amountPaid: p.amountPaid,
+      remainingAmount: Math.max(p.totalAmount - p.amountPaid, 0),
+      dueDate: p.dueDate,
+      utrNumber: p.utrNumber || "Pending",
+      paymentStatus: p.paymentStatus,
+      lastUpdated: p.updatedAt,
+    }));
+
+    res.status(200).json({ payments: formatted });
+  } catch (error) {
+    console.error("Error fetching retailer payments:", error);
+    res.status(500).json({ message: "Error fetching retailer payments", error });
+  }
+};

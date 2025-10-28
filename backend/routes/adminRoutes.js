@@ -1,69 +1,89 @@
 import express from "express";
 import multer from "multer";
 import {
+  // Auth controllers
   loginAdmin,
   addAdmin,
   addClientAdmin,
   addClientUser,
   loginClientAdmin,
+
+  // Middleware
   protect,
+
+  // Campaign controllers
   addCampaign,
   getAllCampaigns,
   deleteCampaign,
+  assignCampaign,
+  updateCampaignPayment,
+
+  // Employee & Retailer controllers
   addEmployee,
   bulkAddEmployees,
-  assignCampaign, // new controller
-} from "../controllers/adminController.js";
+  getAllEmployees,
+  getAllRetailers,
 
-import { getAllEmployees, getAllRetailers } from "../controllers/adminController.js";
+  // Job management controllers
+  getAdminJobs,            // Get all jobs
+  createJobPosting,        // Create a job
+  getJobApplications,      // Get all job applications
+  updateCandidateStatus,   // Update application status
+  getCandidateResume,      // View/download resume
+} from "../controllers/adminController.js";
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
-// ===============================
-// ADMIN AUTH ROUTES
-// ===============================
-
-// Admin login
+/* ===========================================================
+   ADMIN AUTH ROUTES
+   =========================================================== */
 router.post("/login", loginAdmin);
-
-// Admin adds new admin
 router.post("/add-admin", protect, addAdmin);
-
-// Admin adds client admin
 router.post("/add-client-admin", protect, addClientAdmin);
-
-// Admin adds client user
 router.post("/add-client-user", protect, addClientUser);
-
-// Client admin login
 router.post("/client-admin-login", loginClientAdmin);
 
-// ===============================
-// EMPLOYEE ROUTES (own organization)
-// ===============================
-
-// Single employee add
-router.post("/employee", protect, addEmployee);
-
-// Bulk upload employees via Excel/CSV
+/* ===========================================================
+   EMPLOYEE ROUTES
+   =========================================================== */
+router.post("/employees", protect, addEmployee);
 router.post("/employees/bulk", protect, upload.single("file"), bulkAddEmployees);
+router.get("/employees", protect, getAllEmployees);
 
-// ===============================
-// CAMPAIGN ROUTES (admin only)
-// ===============================
+/* ===========================================================
+   RETAILER ROUTES
+   =========================================================== */
+router.get("/retailers", protect, getAllRetailers);
 
-// Create a new campaign
-router.post("/campaign", protect, addCampaign);
-
-// Get all campaigns
+/* ===========================================================
+   CAMPAIGN ROUTES
+   =========================================================== */
+router.post("/campaigns", protect, addCampaign);
 router.get("/campaigns", protect, getAllCampaigns);
+router.delete("/campaigns/:id", protect, deleteCampaign);
+router.post("/campaigns/assign", protect, assignCampaign);
+router.post("/campaigns/payment", protect, updateCampaignPayment);
 
-// Delete a campaign by ID
-router.delete("/campaign/:id", protect, deleteCampaign);
+/* ===========================================================
+   JOB MANAGEMENT ROUTES
+   =========================================================== */
+// ✅ Create a new job posting
+router.post("/jobs", protect, createJobPosting);
 
-// Assign campaign to employees and retailers
-router.post("/campaign/assign", protect, assignCampaign);
-router.get("/employees", protect, getAllEmployees);   // for dropdown
-router.get("/retailers", protect, getAllRetailers);   // for dropdown
+// ✅ Get all job postings (for admin view)
+router.get("/jobs", protect, getAdminJobs);
+
+// ✅ Get all candidate job applications
+router.get("/applications", protect, getJobApplications);
+
+// ✅ Update a candidate’s application status
+router.put("/applications/:id/status", protect, updateCandidateStatus);
+
+// ✅ View or download candidate resume
+router.get("/applications/:id/resume", protect, getCandidateResume);
+
+/* ===========================================================
+   EXPORT ROUTER
+   =========================================================== */
 export default router;

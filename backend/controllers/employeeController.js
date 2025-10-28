@@ -110,3 +110,63 @@ export const updateCampaignStatus = async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+export const clientSetPaymentPlan = async (req, res) => {
+  try {
+    const { campaignId, retailerId, totalAmount, notes, dueDate } = req.body;
+
+    // Only client roles
+    if (!req.user || !["client-admin", "client-user"].includes(req.user.role)) {
+      return res.status(403).json({ message: "Only client admins or users can set payment plans" });
+    }
+
+    // Validate input
+    if (!campaignId || !retailerId || !totalAmount) {
+      return res.status(400).json({ message: "campaignId, retailerId, and totalAmount are required" });
+    }
+
+    // Check if campaign exists
+    const campaign = await Campaign.findById(campaignId);
+    if (!campaign) return res.status(404).json({ message: "Campaign not found" });
+
+    // Check if retailer exists
+    const retailer = await Retailer.findById(retailerId);
+    if (!retailer) return res.status(404).json({ message: "Retailer not found" });
+
+    // Ensure retailer has accepted the campaign
+    const assignedRetailer = campaign.assignedRetailers.find(
+      (r) => r.retailerId.toString() === retailerId.toString() && r.status === "accepted"
+    );
+    if (!assignedRetailer) {
+      return res.status(400).json({ message: "Retailer must be assigned and accepted the campaign" });
+    }
+
+    // Check if a payment plan already exists for this retailer
+    const existingPayment = await Payment.findOne({ campaign: campaignId, retailer: retailerId });
+    if (existingPayment) {
+      return res.status(400).json({ message: "Payment plan already exists for this retailer" });
+    }
+
+    // Create payment plan
+    const payment = new Payment({
+      campaign: campaignId,
+      retailer: retailerId,
+      totalAmount,
+      amountPaid: 0,
+      remainingAmount: totalAmount,
+      paymentStatus: "Pending",
+      lastUpdatedBy: req.user.id, // client admin/user who created
+      notes,
+      dueDate,
+    });
+
+    await payment.save();
+
+    res.status(201).json({
+      message: "Payment plan created successfully",
+      payment,
+    });
+  } catch (error) {
+    console.error("Client set payment plan error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};

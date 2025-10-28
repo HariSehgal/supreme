@@ -1,26 +1,18 @@
 import express from "express";
-import { ClientAdmin, ClientUser } from "../models/user.js";
+import { protect } from "../middleware/authMiddleware.js";
+import {
+  loginClientAdmin,
+  loginClientUser,
+  clientSetPaymentPlan,
+} from "../controllers/clientController.js";
 
 const router = express.Router();
 
-// Create Client Admin
-router.post("/admin", async (req, res) => {
-  try {
-    const admin = await ClientAdmin.create(req.body);
-    res.status(201).json(admin);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+// CLIENT LOGIN
+router.post("/admin/login", loginClientAdmin);
+router.post("/user/login", loginClientUser);
 
-// Create Client User
-router.post("/user", async (req, res) => {
-  try {
-    const user = await ClientUser.create(req.body);
-    res.status(201).json(user);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+// CLIENT PAYMENT PLAN
+router.post("/campaigns/payment", protect, clientSetPaymentPlan);
 
 export default router;
