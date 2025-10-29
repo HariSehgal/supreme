@@ -10,6 +10,8 @@ import {
 } from "../models/user.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
+import nodemailer from "nodemailer";
 import XLSX from "xlsx";
 import { CareerApplication,Job, JobApplication } from "../models/user.js";
 /* ======================================================
@@ -693,30 +695,83 @@ export const getJobApplications = async (req, res) => {
    PUT /admin/career/applications/:applicationId
    body: { status?, currentRound? }
 ====================================================== */
-export const updateCandidateStatus = async (req, res) => {
+
+/* ======================================================
+   UPDATE APPLICATION STATUS (ADMIN)
+   PATCH /api/admin/applications/:id/status
+====================================================== */
+/* ======================================================
+   UPDATE APPLICATION STATUS (ADMIN)
+   PATCH /api/admin/applications/:id/status
+====================================================== */
+export const updateApplicationStatus = async (req, res) => {
   try {
-    const { id } = req.params; // ✅ matches route
+    const { id } = req.params; // Application ID
     const { status, currentRound } = req.body;
 
-    const application = await JobApplication.findById(id);
-    if (!application)
+    // Role check
+    if (!req.user || req.user.role !== "admin") {
+      return res.status(403).json({ message: "Only admins can update application status" });
+    }
+
+    // Fetch application with candidate + job info
+    const application = await JobApplication.findById(id)
+      .populate("candidate", "fullName email")
+      .populate("job", "title totalRounds");
+
+    if (!application) {
       return res.status(404).json({ message: "Application not found" });
+    }
 
+    // Update application fields
     if (status) application.status = status;
-    if (currentRound !== undefined) application.currentRound = currentRound;
-    application.lastUpdated = new Date();
+    if (currentRound !== undefined) {
+      if (currentRound > application.totalRounds)
+        return res.status(400).json({ message: "Current round exceeds total rounds" });
+      application.currentRound = currentRound;
+    }
 
+    application.updatedAt = new Date();
     await application.save();
 
-    res.status(200).json({
-      message: "Application status updated successfully",
+    // Send status update email
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+
+    const mailOptions = {
+      from: `"Supreme Careers" <${process.env.EMAIL_USER}>`,
+      to: application.candidate.email,
+      subject: `Application Update for ${application.job.title}`,
+      html: `
+        <p>Hi ${application.candidate.fullName},</p>
+        <p>Your application status for the position of <b>${application.job.title}</b> has been updated.</p>
+        <p><b>Status:</b> ${application.status}</p>
+        ${
+          currentRound
+            ? `<p><b>Current Round:</b> ${application.currentRound} / ${application.totalRounds}</p>`
+            : ""
+        }
+        <p>Thank you for your continued interest.</p>
+        <p>Best regards,<br>Supreme Careers Team</p>
+      `,
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    return res.status(200).json({
+      message: "Application status updated successfully and email sent",
       application,
     });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
+  } catch (error) {
+    console.error("Error updating application status:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
-
 
 /* ======================================================
    Admin download candidate resume
@@ -747,5 +802,103 @@ export const getCandidateResume = async (req, res) => {
   } catch (error) {
     console.error("Error fetching candidate resume:", error);
     return res.status(500).json({ message: "Server error" });
+  }
+};
+/* ======================================================
+   ADMIN FORGOT PASSWORD
+   POST /api/admin/forgot-password
+====================================================== */
+/* ======================================================
+   ADMIN FORGOT PASSWORD (OTP SEND)
+   POST /api/admin/forgot-password
+====================================================== */
+export const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ message: "Email is required" });
+
+    const admin = await Admin.findOne({ email });
+    if (!admin) return res.status(404).json({ message: "Admin not found" });
+
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Hash OTP before saving
+    const hashedOtp = crypto.createHash("sha256").update(otp).digest("hex");
+
+    admin.resetPasswordToken = hashedOtp;
+    admin.resetPasswordExpires = Date.now() + 10 * 60 * 1000; // valid for 10 minutes
+    await admin.save();
+
+    // Email setup (Gmail)
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+
+    // Email content
+    const mailOptions = {
+      from: `"Supreme Admin Support" <${process.env.EMAIL_USER}>`,
+      to: admin.email,
+      subject: "Your OTP for Password Reset",
+      html: `
+        <p>Hi ${admin.name || "Admin"},</p>
+        <p>Your OTP for password reset is:</p>
+        <h2>${otp}</h2>
+        <p>This OTP is valid for 10 minutes.</p>
+        <p>If you didn't request this, please ignore this email.</p>
+      `,
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    res.status(200).json({ message: "OTP sent successfully to registered email" });
+  } catch (error) {
+    console.error("Forgot password error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+/* ======================================================
+   ADMIN RESET PASSWORD (OTP VERIFY)
+   POST /api/admin/reset-password
+====================================================== */
+export const resetPassword = async (req, res) => {
+  try {
+    const { email, otp, newPassword } = req.body;
+
+    if (!email || !otp || !newPassword)
+      return res.status(400).json({ message: "Email, OTP, and new password are required" });
+
+    const admin = await Admin.findOne({ email });
+    if (!admin) return res.status(404).json({ message: "Admin not found" });
+
+    // Hash the provided OTP to compare
+    const hashedOtp = crypto.createHash("sha256").update(otp).digest("hex");
+
+    if (
+      admin.resetPasswordToken !== hashedOtp ||
+      admin.resetPasswordExpires < Date.now()
+    ) {
+      return res.status(400).json({ message: "Invalid or expired OTP" });
+    }
+
+    // Update password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    admin.password = hashedPassword;
+
+    // Clear OTP fields
+    admin.resetPasswordToken = undefined;
+    admin.resetPasswordExpires = undefined;
+
+    await admin.save();
+
+    res.status(200).json({ message: "Password reset successfully" });
+  } catch (error) {
+    console.error("Reset password error:", error);
+    res.status(500).json({ message: "Server error" });
   }
 };

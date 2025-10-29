@@ -53,6 +53,10 @@ const adminSchema = new Schema(
     name: { type: String, required: true },
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
+
+    // 🔒 For password reset functionality
+    resetPasswordToken: { type: String },
+    resetPasswordExpires: { type: Date },
   },
   { timestamps: true }
 );
@@ -320,40 +324,18 @@ const paymentSchema = new mongoose.Schema(
 const careerApplicationSchema = new mongoose.Schema(
   {
     fullName: { type: String, required: true },
-    phoneNumber: { type: String, required: true },
     email: { type: String, required: true, unique: true },
-    password: { type: String, required: true },
-
+    phone: { type: String },
     resume: {
       data: Buffer,
-      contentType: {
-        type: String,
-        enum: [
-          "application/msword",
-          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-          "image/png",
-          "image/jpeg",
-        ],
-      },
+      contentType: String,
+      fileName: String,
     },
   },
   { timestamps: true }
 );
 
-// Password encryption
-careerApplicationSchema.pre("save", async function (next) {
-  if (!this.isModified("password")) return next();
-  const salt = await bcrypt.genSalt(10);
-  this.password = await bcrypt.hash(this.password, salt);
-  next();
-});
-
-careerApplicationSchema.methods.comparePassword = async function (enteredPassword) {
-  return await bcrypt.compare(enteredPassword, this.password);
-};
-
 export const CareerApplication = mongoose.model("CareerApplication", careerApplicationSchema);
-
 
 /* ===============================
    JOB SCHEMA
@@ -398,30 +380,19 @@ const jobApplicationSchema = new mongoose.Schema(
       ref: "Job",
       required: true,
     },
-
-    // Application progress tracking
-    totalRounds: { type: Number, default: 1 }, // set by admin
-    currentRound: { type: Number, default: 0 },
     status: {
       type: String,
-      enum: [
-        "Pending",
-        "In Review",
-        "Interview Scheduled",
-        "Shortlisted",
-        "Selected",
-        "Rejected",
-      ],
+      enum: ["Pending", "Under Review", "Shortlisted", "Rejected", "Selected"],
       default: "Pending",
     },
-
-    appliedAt: { type: Date, default: Date.now },
-    lastUpdated: { type: Date, default: Date.now },
+    totalRounds: { type: Number, default: 1 },
+    currentRound: { type: Number, default: 0 },
   },
   { timestamps: true }
 );
 
 export const JobApplication = mongoose.model("JobApplication", jobApplicationSchema);
+
 
 export default mongoose.model("Payment", paymentSchema);
 

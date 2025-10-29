@@ -1,116 +1,139 @@
 import { CareerApplication, JobApplication, Job } from "../models/user.js";
-import jwt from "jsonwebtoken";
-import bcrypt from "bcryptjs";
-
-/* ===============================
-   REGISTER CANDIDATE
-=============================== */
-export const registerCareerApplicant = async (req, res) => {
-  try {
-    const { fullName, phoneNumber, email, password } = req.body;
-
-    if (!fullName || !phoneNumber || !email || !password)
-      return res.status(400).json({ message: "All fields are required" });
-
-    const existing = await CareerApplication.findOne({ email });
-    if (existing)
-      return res.status(400).json({ message: "Email already registered" });
-
-    const resume = req.file
-      ? { data: req.file.buffer, contentType: req.file.mimetype }
-      : undefined;
-
-    const candidate = new CareerApplication({
-      fullName,
-      phoneNumber,
-      email,
-      password,
-      resume,
-    });
-
-    await candidate.save();
-    res.status(201).json({
-      message: "Registration successful",
-      candidateId: candidate._id,
-    });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
-
-/* ===============================
-   LOGIN CANDIDATE
-=============================== */
-export const loginCareerApplicant = async (req, res) => {
-  try {
-    const { email, password } = req.body;
-
-    if (!email || !password)
-      return res.status(400).json({ message: "Email and password are required" });
-
-    const user = await CareerApplication.findOne({ email });
-    if (!user) return res.status(404).json({ message: "No account found" });
-
-    const isMatch = await user.comparePassword(password);
-    if (!isMatch)
-      return res.status(401).json({ message: "Invalid credentials" });
-
-    const token = jwt.sign(
-      { id: user._id, email: user.email },
-      process.env.JWT_SECRET || "secretkey",
-      { expiresIn: "7d" }
-    );
-
-    res.status(200).json({
-      message: "Login successful",
-      token,
-      user: {
-        id: user._id,
-        name: user.fullName,
-        email: user.email,
-      },
-    });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
+import nodemailer from "nodemailer";
 
 /* ===============================
    APPLY TO A JOB (Candidate)
 =============================== */
 export const applyToJob = async (req, res) => {
+  console.log("BODY:", req.body);
+  console.log("FILE:", req.file);
+
   try {
-    const { candidateId, jobId } = req.body;
+    const { fullName, email, phone, coverLetter, jobId } = req.body;
+    const resumeFile = req.file;
 
-    if (!candidateId || !jobId)
-      return res.status(400).json({ message: "Candidate ID and Job ID are required" });
+    // ✅ 1. Validate inputs
+    if (!fullName || !email || !jobId)
+      return res
+        .status(400)
+        .json({ message: "Full name, email, and job ID are required" });
 
+    if (!resumeFile)
+      return res.status(400).json({ message: "Resume file is required" });
+
+    // ✅ 2. Validate job existence
     const job = await Job.findById(jobId);
     if (!job || !job.isActive)
       return res.status(404).json({ message: "Job not found or inactive" });
 
+    // ✅ 3. Create or update candidate record
+    let candidate = await CareerApplication.findOne({ email });
+
+    if (!candidate) {
+      candidate = await CareerApplication.create({
+        fullName,
+        email,
+        phone,
+        resume: {
+          data: resumeFile.buffer,
+          contentType: resumeFile.mimetype,
+          fileName: resumeFile.originalname,
+        },
+      });
+    } else {
+      candidate.fullName = fullName;
+      candidate.phone = phone;
+      candidate.resume = {
+        data: resumeFile.buffer,
+        contentType: resumeFile.mimetype,
+        fileName: resumeFile.originalname,
+      };
+      await candidate.save();
+    }
+
+    // ✅ 4. Prevent duplicate applications
     const existingApp = await JobApplication.findOne({
-      candidate: candidateId,
-      job: jobId,
+      candidate: candidate._id,
+      job: job._id,
     });
+
     if (existingApp)
       return res
         .status(400)
-        .json({ message: "You have already applied for this job" });
+        .json({ message: "You have already applied for this job." });
 
-    const newApplication = new JobApplication({
-      candidate: candidateId,
-      job: jobId,
+    // ✅ 5. Create a new job application record
+    const newApplication = await JobApplication.create({
+      candidate: candidate._id,
+      job: job._id,
+      status: "Pending", // ✅ Valid enum value from schema
       totalRounds: 1,
       currentRound: 0,
-      status: "Pending",
     });
 
-    await newApplication.save();
+    // ✅ 6. Send confirmation email to candidate
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
 
+    const mailOptions = {
+      from: `"Career Portal" <${process.env.SMTP_USER}>`,
+      to: email,
+      subject: `Application Received for ${job.title}`,
+      html: `
+        <h2>Application Submitted Successfully</h2>
+        <p>Dear ${fullName},</p>
+        <p>Thank you for applying for the position of <strong>${job.title}</strong>.</p>
+        <p>Your resume has been securely stored in our system and will be reviewed soon.</p>
+        <p><strong>Status:</strong> Pending</p>
+        <br/>
+        <p>Best regards,<br/>HR Team</p>
+      `,
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    // ✅ 7. Respond success
     res.status(201).json({
-      message: "Job application submitted successfully",
+      message: "Application submitted successfully. Confirmation email sent.",
       applicationId: newApplication._id,
+    });
+  } catch (err) {
+    console.error("Error in applyToJob:", err);
+    res.status(500).json({ message: "Internal server error", error: err.message });
+  }
+};
+
+/* ===============================
+   GET ALL JOB POSTINGS (for Candidates)
+=============================== */
+export const getAllJobs = async (req, res) => {
+  try {
+    const { location, department, employmentType, search } = req.query;
+
+    const filters = { isActive: true };
+
+    if (location) filters.location = { $regex: location, $options: "i" };
+    if (department) filters.department = { $regex: department, $options: "i" };
+    if (employmentType)
+      filters.employmentType = { $regex: employmentType, $options: "i" };
+    if (search) filters.title = { $regex: search, $options: "i" };
+
+    const jobs = await Job.find(filters)
+      .sort({ createdAt: -1 })
+      .select("title location department employmentType salaryRange createdAt");
+
+    if (!jobs.length)
+      return res.status(404).json({ message: "No job postings available" });
+
+    res.status(200).json({
+      message: "Job postings retrieved successfully",
+      count: jobs.length,
+      jobs,
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -122,37 +145,20 @@ export const applyToJob = async (req, res) => {
 =============================== */
 export const getCandidateApplications = async (req, res) => {
   try {
-    const { candidateId } = req.params;
+    const { email } = req.params;
 
-    const applications = await JobApplication.find({ candidate: candidateId })
-      .populate("job", "title location employmentType")
-      .select("status currentRound totalRounds appliedAt updatedAt");
+    const applications = await JobApplication.find({ email })
+      .select("jobRole status createdAt");
 
-    if (!applications || applications.length === 0)
-      return res.status(404).json({ message: "No job applications found" });
+    if (!applications.length)
+      return res
+        .status(404)
+        .json({ message: "No job applications found for this candidate" });
 
     res.status(200).json({
       message: "Applications retrieved successfully",
-      data: applications,
-    });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
-
-/* ===============================
-   GET ALL JOB POSTINGS (for Candidates)
-=============================== */
-export const getAllJobs = async (req, res) => {
-  try {
-    const jobs = await Job.find({ isActive: true }).sort({ createdAt: -1 });
-
-    if (!jobs || jobs.length === 0)
-      return res.status(404).json({ message: "No job postings available" });
-
-    res.status(200).json({
-      message: "Job postings retrieved successfully",
-      jobs,
+      count: applications.length,
+      applications,
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
