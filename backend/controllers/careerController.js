@@ -9,7 +9,7 @@ export const applyToJob = async (req, res) => {
   console.log("FILE:", req.file);
 
   try {
-    const { fullName, email, phone, coverLetter, jobId } = req.body;
+    const { fullName, email, phone, city, coverLetter, jobId } = req.body; // ✅ Added city
     const resumeFile = req.file;
 
     // ✅ 1. Validate inputs
@@ -34,6 +34,7 @@ export const applyToJob = async (req, res) => {
         fullName,
         email,
         phone,
+        city, // ✅ Added city here
         resume: {
           data: resumeFile.buffer,
           contentType: resumeFile.mimetype,
@@ -43,6 +44,7 @@ export const applyToJob = async (req, res) => {
     } else {
       candidate.fullName = fullName;
       candidate.phone = phone;
+      candidate.city = city; // ✅ Added city update
       candidate.resume = {
         data: resumeFile.buffer,
         contentType: resumeFile.mimetype,
@@ -66,7 +68,7 @@ export const applyToJob = async (req, res) => {
     const newApplication = await JobApplication.create({
       candidate: candidate._id,
       job: job._id,
-      status: "Pending", // ✅ Valid enum value from schema
+      status: "Pending",
       totalRounds: 1,
       currentRound: 0,
     });
@@ -89,6 +91,7 @@ export const applyToJob = async (req, res) => {
         <p>Dear ${fullName},</p>
         <p>Thank you for applying for the position of <strong>${job.title}</strong>.</p>
         <p>Your resume has been securely stored in our system and will be reviewed soon.</p>
+        <p><strong>City:</strong> ${city}</p> <!-- ✅ Added city info in email -->
         <p><strong>Status:</strong> Pending</p>
         <br/>
         <p>Best regards,<br/>HR Team</p>
@@ -104,7 +107,9 @@ export const applyToJob = async (req, res) => {
     });
   } catch (err) {
     console.error("Error in applyToJob:", err);
-    res.status(500).json({ message: "Internal server error", error: err.message });
+    res
+      .status(500)
+      .json({ message: "Internal server error", error: err.message });
   }
 };
 
@@ -125,7 +130,9 @@ export const getAllJobs = async (req, res) => {
 
     const jobs = await Job.find(filters)
       .sort({ createdAt: -1 })
-      .select("title location department employmentType salaryRange createdAt");
+      .select(
+        "title location department employmentType salaryRange createdAt"
+      );
 
     if (!jobs.length)
       return res.status(404).json({ message: "No job postings available" });
@@ -147,8 +154,9 @@ export const getCandidateApplications = async (req, res) => {
   try {
     const { email } = req.params;
 
-    const applications = await JobApplication.find({ email })
-      .select("jobRole status createdAt");
+    const applications = await JobApplication.find({ email }).select(
+      "jobRole status createdAt"
+    );
 
     if (!applications.length)
       return res

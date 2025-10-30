@@ -326,6 +326,7 @@ const careerApplicationSchema = new mongoose.Schema(
     fullName: { type: String, required: true },
     email: { type: String, required: true, unique: true },
     phone: { type: String },
+    city: { type: String, required: true }, // ✅ Added city field
     resume: {
       data: Buffer,
       contentType: String,
