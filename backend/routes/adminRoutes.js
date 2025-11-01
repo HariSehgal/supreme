@@ -27,7 +27,7 @@ import {
   bulkAddEmployees,
   getAllEmployees,
   getAllRetailers,
-
+updateJobPosting,
   // Job management controllers
   getAdminJobs,
   createJobPosting,
@@ -47,6 +47,7 @@ router.post("/add-admin", protect, addAdmin);
 router.post("/add-client-admin", protect, addClientAdmin);
 router.post("/add-client-user", protect, addClientUser);
 router.post("/client-admin-login", loginClientAdmin);
+router.put("/career/jobs/:id", protect, updateJobPosting);
 
 /* ===========================================================
    PASSWORD RESET ROUTES
@@ -84,7 +85,7 @@ router.post("/campaigns/payment", protect, updateCampaignPayment);
 router.post("/jobs", protect, createJobPosting);
 router.get("/jobs", protect, getAdminJobs);
 router.get("/applications", protect, getJobApplications);
-router.put("/applications/:id/status", protect, updateApplicationStatus); // ✅ email notification on status change
+router.put("/applications/:id/status", protect, updateApplicationStatus); 
 router.get("/applications/:id/resume", protect, getCandidateResume);
 
 /* ===========================================================
