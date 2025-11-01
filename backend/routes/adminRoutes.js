@@ -47,7 +47,7 @@ router.post("/add-admin", protect, addAdmin);
 router.post("/add-client-admin", protect, addClientAdmin);
 router.post("/add-client-user", protect, addClientUser);
 router.post("/client-admin-login", loginClientAdmin);
-router.put("/career/jobs/:id", protect, updateJobPosting);
+router.put("/jobs/:id", protect, updateJobPosting);
 
 /* ===========================================================
    PASSWORD RESET ROUTES
