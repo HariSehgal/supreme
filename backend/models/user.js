@@ -350,9 +350,11 @@ const jobSchema = new mongoose.Schema(
     experienceRequired: { type: String },
     employmentType: {
       type: String,
-      enum: ["Full-Time", "Part-Time", "Internship", "Contract"],
+      enum: ["Full-Time", "Part-Time", "Contract-Based"],
       default: "Full-Time",
-    },
+      required: true
+    }
+    ,
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Admin",
@@ -362,6 +364,7 @@ const jobSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
 
 export const Job = mongoose.model("Job", jobSchema);
 
