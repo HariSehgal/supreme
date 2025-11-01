@@ -701,14 +701,8 @@ export const getAdminJobs = async (req, res) => {
 ====================================================== */
 export const updateJobPosting = async (req, res) => {
   try {
-   
     if (!req.user || !req.user.id)
       return res.status(401).json({ message: "Not authorized, please log in" });
-
-  
-    const admin = await Admin.findById(req.user.id);
-    if (!admin)
-      return res.status(403).json({ message: "Only registered admins can update job postings" });
 
     const { id } = req.params;
     const {
@@ -721,26 +715,28 @@ export const updateJobPosting = async (req, res) => {
       isActive,
     } = req.body;
 
-    
-    const job = await Job.findOne({ _id: id, createdBy: req.user.id });
-    if (!job)
-      return res.status(404).json({ message: "Job not found or not authorized to update" });
+    // ✅ Find by ID only (remove createdBy restriction if single admin)
+    const job = await Job.findById(id);
 
-   
-    if (title !== undefined) job.title = title;
-    if (description !== undefined) job.description = description;
-    if (location !== undefined) job.location = location;
-    if (salaryRange !== undefined) job.salaryRange = salaryRange;
-    if (experienceRequired !== undefined) job.experienceRequired = experienceRequired;
-    if (employmentType !== undefined) job.employmentType = employmentType;
-    if (isActive !== undefined) job.isActive = isActive;
+    if (!job) return res.status(404).json({ message: "Job not found" });
+
+    // ✅ Update fields dynamically
+    Object.assign(job, {
+      ...(title && { title }),
+      ...(description && { description }),
+      ...(location && { location }),
+      ...(salaryRange && { salaryRange }),
+      ...(experienceRequired && { experienceRequired }),
+      ...(employmentType && { employmentType }),
+      ...(isActive !== undefined && { isActive }),
+    });
 
     await job.save();
 
     res.status(200).json({ message: "Job updated successfully", job });
   } catch (error) {
     console.error("Update job posting error:", error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: error.message || "Server error" });
   }
 };
 /* ======================================================
