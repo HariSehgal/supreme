@@ -21,7 +21,7 @@ import {
   deleteCampaign,
   assignCampaign,
   updateCampaignPayment,
-
+getSingleAdminJob,
   // Employee & Retailer controllers
   addEmployee,
   bulkAddEmployees,
@@ -78,14 +78,14 @@ router.get("/campaigns", protect, getAllCampaigns);
 router.delete("/campaigns/:id", protect, deleteCampaign);
 router.post("/campaigns/assign", protect, assignCampaign);
 router.post("/campaigns/payment", protect, updateCampaignPayment);
-
+router.get("/admin/career/jobs/:id", protect, getSingleAdminJob);
 /* ===========================================================
    JOB MANAGEMENT ROUTES
 =========================================================== */
 router.post("/jobs", protect, createJobPosting);
 router.get("/jobs", protect, getAdminJobs);
 router.get("/applications", protect, getJobApplications);
-router.put("/applications/:id/status", protect, updateApplicationStatus); 
+router.put("/applications/:id/status", protect, updateApplicationStatus); // ✅ email notification on status change
 router.get("/applications/:id/resume", protect, getCandidateResume);
 
 /* ===========================================================
