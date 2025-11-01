@@ -154,30 +154,34 @@ export const applyToJob = async (req, res) => {
 ============================================================ */
 export const getAllJobs = async (req, res) => {
   try {
-    const { location, employmentType, search } = req.query;
+    const { location, department, employmentType, search } = req.query;
 
+    // Base filter: only active jobs
     const filters = { isActive: true };
+
     if (location) filters.location = { $regex: location, $options: "i" };
+    if (department) filters.department = { $regex: department, $options: "i" };
     if (employmentType) filters.employmentType = { $regex: employmentType, $options: "i" };
     if (search) filters.title = { $regex: search, $options: "i" };
 
+    // Include all necessary fields in selection
     const jobs = await Job.find(filters)
       .sort({ createdAt: -1 })
-      .select("title description location employmentType salaryRange createdAt");
+      .select(
+        "title description location department employmentType salaryRange experienceRequired createdAt"
+      );
 
     if (!jobs.length) {
       return res.status(404).json({ message: "No job postings available" });
     }
 
-    // ✅ Send to frontend
     res.status(200).json({
-      success: true,
       message: "Job postings retrieved successfully",
       count: jobs.length,
-      jobs, // frontend will receive title, description, location, etc.
+      jobs,
     });
   } catch (err) {
-    console.error("❌ Error fetching jobs:", err.message);
+    console.error("Error fetching jobs:", err.message);
     res.status(500).json({ message: "Internal server error" });
   }
 };
