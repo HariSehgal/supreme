@@ -380,7 +380,33 @@ export const bulkAddEmployees = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+//single admin
 
+export const getSingleAdminJob = async (req, res) => {
+  try {
+    // ✅ Ensure user is logged in
+    if (!req.user || !req.user.id)
+      return res.status(401).json({ message: "Not authorized, please log in" });
+
+    // ✅ Verify user exists in Admin collection
+    const admin = await Admin.findById(req.user.id);
+    if (!admin)
+      return res.status(403).json({ message: "Only registered admins can view job details" });
+
+    const { id } = req.params;
+
+    // ✅ Find the job (allow all jobs if multiple admins manage jobs)
+    const job = await Job.findById(id);
+
+    if (!job)
+      return res.status(404).json({ message: "Job not found" });
+
+    res.status(200).json({ job });
+  } catch (error) {
+    console.error("Get single admin job error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
 /* ======================================================
    ASSIGN CAMPAIGN TO EMPLOYEES & RETAILERS
 ====================================================== */
