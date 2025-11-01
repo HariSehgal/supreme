@@ -87,7 +87,7 @@ router.get("/jobs", protect, getAdminJobs);
 router.get("/applications", protect, getJobApplications);
 router.put("/applications/:id/status", protect, updateApplicationStatus); // ✅ email notification on status change
 router.get("/applications/:id/resume", protect, getCandidateResume);
-router.get("/admin/career/jobs/:id", protect, getSingleAdminJob);
+router.get("/career/jobs/:id", protect, getSingleAdminJob);
 /* ===========================================================
    EXPORT ROUTER
 =========================================================== */
