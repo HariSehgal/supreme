@@ -653,17 +653,70 @@ export const createJobPosting = async (req, res) => {
 ====================================================== */
 export const getAdminJobs = async (req, res) => {
   try {
-    if (!req.user || req.user.role !== "admin")
-      return res.status(403).json({ message: "Only admins can view their jobs" });
+    if (!req.user || !req.user.id)
+      return res.status(401).json({ message: "Not authorized, please log in" });
 
-    const jobs = await Job.find({ createdBy: req.user.id }).sort({ createdAt: -1 });
+    const admin = await Admin.findById(req.user.id);
+    if (!admin)
+      return res.status(403).json({ message: "Only registered admins can view jobs" });
+
+ 
+    const jobs = await Job.find().sort({ createdAt: -1 });
     res.status(200).json({ jobs });
   } catch (error) {
     console.error("Get admin jobs error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
+/* ======================================================
+   Update or Change Status of a Job Posting
+   PUT /admin/career/jobs/:id
+   Body: { title?, description?, location?, salaryRange?, experienceRequired?, employmentType?, isActive? }
+====================================================== */
+export const updateJobPosting = async (req, res) => {
+  try {
+   
+    if (!req.user || !req.user.id)
+      return res.status(401).json({ message: "Not authorized, please log in" });
 
+  
+    const admin = await Admin.findById(req.user.id);
+    if (!admin)
+      return res.status(403).json({ message: "Only registered admins can update job postings" });
+
+    const { id } = req.params;
+    const {
+      title,
+      description,
+      location,
+      salaryRange,
+      experienceRequired,
+      employmentType,
+      isActive,
+    } = req.body;
+
+    
+    const job = await Job.findOne({ _id: id, createdBy: req.user.id });
+    if (!job)
+      return res.status(404).json({ message: "Job not found or not authorized to update" });
+
+   
+    if (title !== undefined) job.title = title;
+    if (description !== undefined) job.description = description;
+    if (location !== undefined) job.location = location;
+    if (salaryRange !== undefined) job.salaryRange = salaryRange;
+    if (experienceRequired !== undefined) job.experienceRequired = experienceRequired;
+    if (employmentType !== undefined) job.employmentType = employmentType;
+    if (isActive !== undefined) job.isActive = isActive;
+
+    await job.save();
+
+    res.status(200).json({ message: "Job updated successfully", job });
+  } catch (error) {
+    console.error("Update job posting error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
 /* ======================================================
    Get applications for a specific job (admin)
    GET /admin/career/jobs/:jobId/applications
