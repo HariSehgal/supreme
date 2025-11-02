@@ -854,26 +854,54 @@ export const updateApplicationStatus = async (req, res) => {
 ====================================================== */
 export const getCandidateResume = async (req, res) => {
   try {
-    if (!req.user || req.user.role !== "admin")
+   
+    if (!req.user || req.user.role !== "admin") {
       return res.status(403).json({ message: "Only admins can access resumes" });
+    }
 
-    const { applicationId } = req.params;
-    const application = await JobApplication.findById(applicationId).populate("candidate");
-    if (!application) return res.status(404).json({ message: "Application not found" });
+    
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid application ID" });
+    }
 
-    const candidate = application.candidate;
-    if (!candidate || !candidate.resume || !candidate.resume.data)
+    
+    const application = await JobApplication.findById(id);
+    if (!application) {
+      return res.status(404).json({ message: "Application not found" });
+    }
+
+    
+    const candidateId = application.candidate;
+    if (!candidateId) {
+      return res.status(404).json({ message: "Candidate not linked to this application" });
+    }
+
+    
+    const candidate = await CareerApplication.findById(candidateId);
+    if (!candidate) {
+      return res.status(404).json({ message: "Candidate record not found" });
+    }
+
+   
+    const resume = candidate.resume;
+    if (!resume?.data || !resume?.contentType) {
       return res.status(404).json({ message: "Resume not uploaded or unavailable" });
+    }
 
-    const ext = candidate.resume.contentType.split("/")[1] || "bin";
-    const filename = `${candidate.fullName.replace(/\s+/g, "_")}_Resume.${ext}`;
+
+    const ext = resume.contentType.split("/")[1] || "pdf";
+    const filename = resume.fileName
+      ? resume.fileName
+      : `${candidate.fullName.replace(/\s+/g, "_")}_Resume.${ext}`;
 
     res.set({
-      "Content-Type": candidate.resume.contentType,
+      "Content-Type": resume.contentType,
       "Content-Disposition": `attachment; filename="${filename}"`,
     });
 
-    return res.send(candidate.resume.data);
+   
+    return res.send(resume.data);
   } catch (error) {
     console.error("Error fetching candidate resume:", error);
     return res.status(500).json({ message: "Server error" });
