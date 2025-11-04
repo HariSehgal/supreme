@@ -848,10 +848,12 @@ export const updateApplicationStatus = async (req, res) => {
   }
 };
 
+/* ======================================================
+   MAP JOBS TO APPLICATIONS FUNCTION
+====================================================== */
 export const mapJobToApplications = async (jobId = null) => {
   try {
     if (jobId) {
-      // ✅ Map a single job (if ID provided)
       const applications = await JobApplication.find({ job: jobId }).select("_id");
       await Job.findByIdAndUpdate(jobId, {
         applications: applications.map((a) => a._id),
@@ -859,7 +861,6 @@ export const mapJobToApplications = async (jobId = null) => {
       return { message: "Applications mapped to the specified job", jobId };
     }
 
-    // ✅ Otherwise map all jobs
     const jobs = await Job.find({}, "_id");
     for (const job of jobs) {
       const applications = await JobApplication.find({ job: job._id }).select("_id");
@@ -874,6 +875,26 @@ export const mapJobToApplications = async (jobId = null) => {
     throw new Error("Job-Application mapping failed");
   }
 };
+
+/* ======================================================
+   MANUAL MAPPING ENDPOINT (ADMIN)
+====================================================== */
+export const syncJobApplications = async (req, res) => {
+  try {
+    if (!req.user || req.user.role !== "admin")
+      return res
+        .status(403)
+        .json({ message: "Only admins can perform this action" });
+
+    const { jobId } = req.params;
+    const result = await mapJobToApplications(jobId || null);
+    res.status(200).json(result);
+  } catch (error) {
+    console.error("Sync job applications error:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
 /* ======================================================
    Admin download candidate resume
    GET /admin/career/applications/:applicationId/resume
