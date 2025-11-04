@@ -848,6 +848,32 @@ export const updateApplicationStatus = async (req, res) => {
   }
 };
 
+export const mapJobToApplications = async (jobId = null) => {
+  try {
+    if (jobId) {
+      // ✅ Map a single job (if ID provided)
+      const applications = await JobApplication.find({ job: jobId }).select("_id");
+      await Job.findByIdAndUpdate(jobId, {
+        applications: applications.map((a) => a._id),
+      });
+      return { message: "Applications mapped to the specified job", jobId };
+    }
+
+    // ✅ Otherwise map all jobs
+    const jobs = await Job.find({}, "_id");
+    for (const job of jobs) {
+      const applications = await JobApplication.find({ job: job._id }).select("_id");
+      await Job.findByIdAndUpdate(job._id, {
+        applications: applications.map((a) => a._id),
+      });
+    }
+
+    return { message: "All jobs mapped successfully" };
+  } catch (error) {
+    console.error("Error mapping jobs to applications:", error);
+    throw new Error("Job-Application mapping failed");
+  }
+};
 /* ======================================================
    Admin download candidate resume
    GET /admin/career/applications/:applicationId/resume
