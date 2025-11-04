@@ -7,7 +7,7 @@ import {
   addClientAdmin,
   addClientUser,
   loginClientAdmin,
-
+ syncJobApplications,
   // Forgot / Reset Password controllers
   forgotPassword,
   resetPassword,
@@ -88,6 +88,10 @@ router.get("/applications", protect, getJobApplications);
 router.put("/applications/:id/status", protect, updateApplicationStatus); 
 router.get("/applications/:id/resume", protect, getCandidateResume);
 router.get("/jobs/:id", protect, getSingleAdminJob);
+router.get("/jobs/map", protect, syncJobApplications);
+
+// 🔹 Map one specific job
+router.get("/jobs/:jobId/map", protect, syncJobApplications);
 /* ===========================================================
    EXPORT ROUTER
 =========================================================== */
