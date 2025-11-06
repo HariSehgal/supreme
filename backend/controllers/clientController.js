@@ -8,23 +8,47 @@ import { ClientAdmin, ClientUser, Campaign, Payment } from "../models/user.js";
 export const loginClientAdmin = async (req, res) => {
   try {
     const { email, password } = req.body;
+
+    if (!email || !password)
+      return res.status(400).json({ message: "Email and password are required" });
+
     const admin = await ClientAdmin.findOne({ email });
-    if (!admin) return res.status(404).json({ message: "Client Admin not found" });
+    if (!admin)
+      return res.status(404).json({ message: "Client Admin not found" });
 
     const isMatch = await bcrypt.compare(password, admin.password);
-    if (!isMatch) return res.status(400).json({ message: "Invalid credentials" });
+    if (!isMatch)
+      return res.status(400).json({ message: "Invalid credentials" });
+
+    // ✅ Use JWT_SECRET strictly
+    if (!process.env.JWT_SECRET) {
+      console.error("❌ JWT_SECRET is missing in environment variables");
+      return res.status(500).json({ message: "Server configuration error" });
+    }
 
     const token = jwt.sign(
-      { id: admin._id, role: "client_admin" },
-      process.env.JWT_SECRET || "supremeSecretKey",
+      { id: admin._id, email: admin.email, role: "client-admin" },
+      process.env.JWT_SECRET,             // ✅ from .env
       { expiresIn: "7d" }
     );
 
-    res.status(200).json({ message: "Login successful", token, admin });
+    res.status(200).json({
+      message: "Client admin login successful",
+      token,
+      clientAdmin: {
+        id: admin._id,
+        name: admin.name,
+        email: admin.email,
+        contactNo: admin.contactNo,
+        organizationName: admin.organizationName,
+      },
+    });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error("Login client admin error:", err);
+    res.status(500).json({ message: "Server error" });
   }
 };
+
 
 /* ===========================
    CLIENT USER LOGIN
