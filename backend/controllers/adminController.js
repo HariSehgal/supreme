@@ -686,47 +686,57 @@ export const registerRetailer = async (req, res) => {
   try {
     const body = req.body;
     const files = req.files || {};
+
     const { contactNo, email } = body;
 
     if (!email || !contactNo)
-      return res.status(400).json({ message: "Email and contact number are required" });
+      return res
+        .status(400)
+        .json({ message: "Email and contact number are required" });
 
-    // ✅ OTP REMOVED COMPLETELY
-    // ✅ Admin or self can add a retailer without OTP
-
+    // ✅ Personal Address (flat from frontend)
     const personalAddress = {
       address: body.address,
       city: body.city,
       state: body.state,
       geoTags: {
-        lat: parseFloat(body.geoTags?.lat) || 0,
-        lng: parseFloat(body.geoTags?.lng) || 0,
+        lat: parseFloat(body["geoTags.lat"]) || 0,
+        lng: parseFloat(body["geoTags.lng"]) || 0,
       },
     };
 
+    // ✅ Shop Address
     const shopAddress = {
-      address: body["shopDetails.shopAddress.address"] || body.shopAddress,
-      city: body["shopDetails.shopAddress.city"] || body.shopCity,
-      state: body["shopDetails.shopAddress.state"] || body.shopState,
+      address: body["shopDetails.shopAddress.address"] || body.address,
+      address2: body.address2 || "",
+      city: body["shopDetails.shopAddress.city"] || body.city,
+      state: body["shopDetails.shopAddress.state"] || body.state,
+      pincode: body.pincode,
       geoTags: {
         lat: parseFloat(body["shopDetails.shopAddress.geoTags.lat"]) || 0,
         lng: parseFloat(body["shopDetails.shopAddress.geoTags.lng"]) || 0,
       },
     };
 
+    // ✅ Shop Details
     const shopDetails = {
       shopName: body["shopDetails.shopName"] || body.shopName,
       businessType: body["shopDetails.businessType"] || body.businessType,
       ownershipType: body["shopDetails.ownershipType"] || body.ownershipType,
-      dateOfEstablishment: body["shopDetails.dateOfEstablishment"] || body.dateOfEstablishment,
       GSTNo: body["shopDetails.GSTNo"] || body.GSTNo,
       PANCard: body["shopDetails.PANCard"] || body.PANCard,
+      dateOfEstablishment:
+        body["shopDetails.dateOfEstablishment"] || body.dateOfEstablishment,
       shopAddress,
       outletPhoto: files.outletPhoto
-        ? { data: files.outletPhoto[0].buffer, contentType: files.outletPhoto[0].mimetype }
+        ? {
+            data: files.outletPhoto[0].buffer,
+            contentType: files.outletPhoto[0].mimetype,
+          }
         : undefined,
     };
 
+    // ✅ Bank Details
     const bankDetails = {
       bankName: body["bankDetails.bankName"] || body.bankName,
       accountNumber: body["bankDetails.accountNumber"] || body.accountNumber,
@@ -734,13 +744,17 @@ export const registerRetailer = async (req, res) => {
       branchName: body["bankDetails.branchName"] || body.branchName,
     };
 
-    // Check if email or phone already exists
+    // ✅ Check existing retailer
     const existingRetailer = await Retailer.findOne({
       $or: [{ contactNo }, { email }],
     });
-    if (existingRetailer)
-      return res.status(400).json({ message: "Phone or email already registered" });
 
+    if (existingRetailer)
+      return res
+        .status(400)
+        .json({ message: "Phone or email already registered" });
+
+    // ✅ Create new retailer
     const retailer = new Retailer({
       name: body.name,
       contactNo,
@@ -749,25 +763,34 @@ export const registerRetailer = async (req, res) => {
       gender: body.gender,
       govtIdType: body.govtIdType,
       govtIdNumber: body.govtIdNumber,
+
       govtIdPhoto: files.govtIdPhoto
-        ? { data: files.govtIdPhoto[0].buffer, contentType: files.govtIdPhoto[0].mimetype }
+        ? {
+            data: files.govtIdPhoto[0].buffer,
+            contentType: files.govtIdPhoto[0].mimetype,
+          }
         : undefined,
+
       personPhoto: files.personPhoto
-        ? { data: files.personPhoto[0].buffer, contentType: files.personPhoto[0].mimetype }
+        ? {
+            data: files.personPhoto[0].buffer,
+            contentType: files.personPhoto[0].mimetype,
+          }
         : undefined,
-      signature: files.signature
-        ? { data: files.signature[0].buffer, contentType: files.signature[0].mimetype }
+
+      registrationForm: files.registrationForm
+        ? {
+            data: files.registrationForm[0].buffer,
+            contentType: files.registrationForm[0].mimetype,
+          }
         : undefined,
-      personalAddress,
+
       shopDetails,
       bankDetails,
+      personalAddress,
 
-     
       createdBy: body.createdBy || "AdminAdded",
-
-      
       phoneVerified: true,
-
       partOfIndia: body.partOfIndia || "N",
     });
 
