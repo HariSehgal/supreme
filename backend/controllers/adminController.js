@@ -682,7 +682,106 @@ export const updateCampaignPayment = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+export const registerRetailer = async (req, res) => {
+  try {
+    const body = req.body;
+    const files = req.files || {};
+    const { contactNo, email } = body;
 
+    if (!email || !contactNo)
+      return res.status(400).json({ message: "Email and contact number are required" });
+
+    // ✅ OTP REMOVED COMPLETELY
+    // ✅ Admin or self can add a retailer without OTP
+
+    const personalAddress = {
+      address: body.address,
+      city: body.city,
+      state: body.state,
+      geoTags: {
+        lat: parseFloat(body.geoTags?.lat) || 0,
+        lng: parseFloat(body.geoTags?.lng) || 0,
+      },
+    };
+
+    const shopAddress = {
+      address: body["shopDetails.shopAddress.address"] || body.shopAddress,
+      city: body["shopDetails.shopAddress.city"] || body.shopCity,
+      state: body["shopDetails.shopAddress.state"] || body.shopState,
+      geoTags: {
+        lat: parseFloat(body["shopDetails.shopAddress.geoTags.lat"]) || 0,
+        lng: parseFloat(body["shopDetails.shopAddress.geoTags.lng"]) || 0,
+      },
+    };
+
+    const shopDetails = {
+      shopName: body["shopDetails.shopName"] || body.shopName,
+      businessType: body["shopDetails.businessType"] || body.businessType,
+      ownershipType: body["shopDetails.ownershipType"] || body.ownershipType,
+      dateOfEstablishment: body["shopDetails.dateOfEstablishment"] || body.dateOfEstablishment,
+      GSTNo: body["shopDetails.GSTNo"] || body.GSTNo,
+      PANCard: body["shopDetails.PANCard"] || body.PANCard,
+      shopAddress,
+      outletPhoto: files.outletPhoto
+        ? { data: files.outletPhoto[0].buffer, contentType: files.outletPhoto[0].mimetype }
+        : undefined,
+    };
+
+    const bankDetails = {
+      bankName: body["bankDetails.bankName"] || body.bankName,
+      accountNumber: body["bankDetails.accountNumber"] || body.accountNumber,
+      IFSC: body["bankDetails.IFSC"] || body.IFSC,
+      branchName: body["bankDetails.branchName"] || body.branchName,
+    };
+
+    // Check if email or phone already exists
+    const existingRetailer = await Retailer.findOne({
+      $or: [{ contactNo }, { email }],
+    });
+    if (existingRetailer)
+      return res.status(400).json({ message: "Phone or email already registered" });
+
+    const retailer = new Retailer({
+      name: body.name,
+      contactNo,
+      email,
+      dob: body.dob,
+      gender: body.gender,
+      govtIdType: body.govtIdType,
+      govtIdNumber: body.govtIdNumber,
+      govtIdPhoto: files.govtIdPhoto
+        ? { data: files.govtIdPhoto[0].buffer, contentType: files.govtIdPhoto[0].mimetype }
+        : undefined,
+      personPhoto: files.personPhoto
+        ? { data: files.personPhoto[0].buffer, contentType: files.personPhoto[0].mimetype }
+        : undefined,
+      signature: files.signature
+        ? { data: files.signature[0].buffer, contentType: files.signature[0].mimetype }
+        : undefined,
+      personalAddress,
+      shopDetails,
+      bankDetails,
+
+     
+      createdBy: body.createdBy || "AdminAdded",
+
+      
+      phoneVerified: true,
+
+      partOfIndia: body.partOfIndia || "N",
+    });
+
+    await retailer.save();
+
+    res.status(201).json({
+      message: "Retailer registered successfully",
+      uniqueId: retailer.uniqueId,
+    });
+  } catch (error) {
+    console.error("Retailer registration error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
 /* ======================================================
    ADMIN FETCHES ALL PAYMENTS FOR A CAMPAIGN
 ====================================================== */
