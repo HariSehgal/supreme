@@ -22,6 +22,7 @@ import {
   assignCampaign,
   updateCampaignPayment,
 getSingleAdminJob,
+    updateCampaignStatus,
   // Employee & Retailer controllers
   addEmployee,
   bulkAddEmployees,
@@ -78,6 +79,7 @@ router.get("/campaigns", protect, getAllCampaigns);
 router.delete("/campaigns/:id", protect, deleteCampaign);
 router.post("/campaigns/assign", protect, assignCampaign);
 router.post("/campaigns/payment", protect, updateCampaignPayment);
+router.patch("/campaigns/:id/status", protect, updateCampaignStatus);
 
 /* ===========================================================
    JOB MANAGEMENT ROUTES
