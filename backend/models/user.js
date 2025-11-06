@@ -116,7 +116,7 @@ const retailerSchema = new Schema(
     govtIdNumber: String,
     govtIdPhoto: { data: Buffer, contentType: String },
     personPhoto: { data: Buffer, contentType: String },
-    registrationForm: { data: Buffer, contentType: String },
+    registrationForm: { data: Buffer, contentType: String },   // ✅ ADDED
     shopDetails: {
       shopName: String,
       businessType: String,
@@ -140,7 +140,7 @@ const retailerSchema = new Schema(
     },
     createdBy: {
       type: String,
-      enum: ["RetailerSelf", "Employee"],
+      enum: ["RetailerSelf", "Employee", "AdminAdded"],
       default: "RetailerSelf",
     },
     phoneVerified: { type: Boolean, default: false },
@@ -154,41 +154,11 @@ const retailerSchema = new Schema(
       type: Schema.Types.ObjectId,
       ref: "Employee",
     },
+
+    partOfIndia: { type: String, default: "N" }, // ✅ ADDED
   },
   { timestamps: true }
 );
-
-// Hash password and generate uniqueId & retailerCode
-retailerSchema.pre("save", async function (next) {
-  try {
-    if (!this.password && this.contactNo) {
-      const salt = await bcrypt.genSalt(10);
-      this.password = await bcrypt.hash(this.contactNo, salt);
-    }
-
-    if (!this.uniqueId) {
-      const state = this.shopDetails?.shopAddress?.state || "NA";
-      const city = this.shopDetails?.shopAddress?.city || "NA";
-      const partOfIndia = this.partOfIndia || "N";
-      const typeOfStore =
-        (this.shopDetails?.businessType || "O").charAt(0).toUpperCase();
-      const stateCode = stateCodes[state] || "XX";
-      const cityCode = city.substring(0, 3).toUpperCase();
-      const randomNum = Math.floor(1000 + Math.random() * 9000);
-      this.uniqueId = `${partOfIndia}${typeOfStore}${stateCode}${cityCode}${randomNum}`;
-    }
-
-    if (!this.retailerCode) {
-      const timestampPart = Date.now().toString().slice(-6);
-      const randPart = Math.floor(100 + Math.random() * 900);
-      this.retailerCode = `R${timestampPart}${randPart}`;
-    }
-
-    next();
-  } catch (err) {
-    next(err);
-  }
-});
 export const Retailer = model("Retailer", retailerSchema);
 
 /* ===============================
