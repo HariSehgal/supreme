@@ -560,37 +560,50 @@ export const assignCampaign = async (req, res) => {
 //update the campaign
 export const updateCampaignStatus = async (req, res) => {
   try {
+    // ✅ Only admin can update
     if (!req.user || req.user.role !== "admin") {
-      return res.status(403).json({ message: "Only admins can update campaign status" });
+      return res.status(403).json({
+        message: "Only admins can update campaign status",
+      });
     }
 
     const { id } = req.params;
-    const { isActive } = req.body;
+    let { isActive } = req.body;
 
-    if (isActive === undefined) {
-      return res.status(400).json({ message: "isActive field is required (true/false)" });
+    //  Check field exists
+    if (isActive === undefined || isActive === null) {
+      return res.status(400).json({
+        message: "isActive field is required (true/false)",
+      });
+    }
+
+    //  Convert string to boolean if needed
+    if (typeof isActive === "string") {
+      isActive = isActive.toLowerCase() === "true";
     }
 
     //  Find campaign
     const campaign = await Campaign.findById(id);
+
     if (!campaign) {
       return res.status(404).json({ message: "Campaign not found" });
     }
 
-    //  Update status
+    //  Update and save
     campaign.isActive = isActive;
     await campaign.save();
 
-    res.status(200).json({
-      message: `Campaign ${isActive ? "activated" : "deactivated"} successfully`,
+    return res.status(200).json({
+      message: `Campaign has been ${isActive ? "activated" : "deactivated"} successfully`,
       campaign,
     });
 
   } catch (error) {
     console.error("Update campaign status error:", error);
-    res.status(500).json({ message: "Server error" });
+    return res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+
 
 /* ======================================================
    FETCH ALL EMPLOYEES
