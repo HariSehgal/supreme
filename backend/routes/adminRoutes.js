@@ -7,13 +7,14 @@ import {
   addClientAdmin,
   addClientUser,
   loginClientAdmin,
- syncJobApplications,
+registerRetailer,  
   // Forgot / Reset Password controllers
   forgotPassword,
   resetPassword,
 
   // Middleware
   protect,
+  updateCampaignStatus,
 
   // Campaign controllers
   addCampaign,
@@ -22,7 +23,6 @@ import {
   assignCampaign,
   updateCampaignPayment,
 getSingleAdminJob,
-    updateCampaignStatus,
   // Employee & Retailer controllers
   addEmployee,
   bulkAddEmployees,
@@ -48,7 +48,7 @@ router.post("/add-admin", protect, addAdmin);
 router.post("/add-client-admin", protect, addClientAdmin);
 router.post("/add-client-user", protect, addClientUser);
 router.post("/client-admin-login", loginClientAdmin);
-router.put("/jobs/:id", protect, updateJobPosting);
+
 
 /* ===========================================================
    PASSWORD RESET ROUTES
@@ -70,7 +70,17 @@ router.get("/employees", protect, getAllEmployees);
    RETAILER ROUTES
 =========================================================== */
 router.get("/retailers", protect, getAllRetailers);
-
+router.post(
+  "/retailers",
+  protect,
+  upload.fields([
+    { name: "govtIdPhoto", maxCount: 1 },
+    { name: "personPhoto", maxCount: 1 },
+    { name: "signature", maxCount: 1 },
+    { name: "outletPhoto", maxCount: 1 },
+  ]),
+  registerRetailer
+);
 /* ===========================================================
    CAMPAIGN ROUTES
 =========================================================== */
@@ -79,6 +89,7 @@ router.get("/campaigns", protect, getAllCampaigns);
 router.delete("/campaigns/:id", protect, deleteCampaign);
 router.post("/campaigns/assign", protect, assignCampaign);
 router.post("/campaigns/payment", protect, updateCampaignPayment);
+router.get("/admin/career/jobs/:id", protect, getSingleAdminJob);
 router.patch("/campaigns/:id/status", protect, updateCampaignStatus);
 
 /* ===========================================================
@@ -87,13 +98,10 @@ router.patch("/campaigns/:id/status", protect, updateCampaignStatus);
 router.post("/jobs", protect, createJobPosting);
 router.get("/jobs", protect, getAdminJobs);
 router.get("/applications", protect, getJobApplications);
-router.put("/applications/:id/status", protect, updateApplicationStatus); 
+router.put("/applications/:id/status", protect, updateApplicationStatus);
 router.get("/applications/:id/resume", protect, getCandidateResume);
-router.get("/jobs/:id", protect, getSingleAdminJob);
-router.get("/jobs/map", protect, syncJobApplications);
-
-// 🔹 Map one specific job
-router.get("/jobs/:jobId/map", protect, syncJobApplications);
+router.get("/career/jobs/:id", protect, getSingleAdminJob);
+router.put("/jobs/:id", protect, updateJobPosting);
 /* ===========================================================
    EXPORT ROUTER
 =========================================================== */
