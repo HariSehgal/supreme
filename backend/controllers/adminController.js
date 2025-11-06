@@ -640,32 +640,33 @@ export const updateCampaignStatus = async (req, res) => {
     const { id } = req.params;
     let { isActive } = req.body;
 
-    //  Check field exists
+    // ✅ check
     if (isActive === undefined || isActive === null) {
       return res.status(400).json({
         message: "isActive field is required (true/false)",
       });
     }
 
-    //  Convert string to boolean if needed
+    // ✅ convert string -> boolean
     if (typeof isActive === "string") {
       isActive = isActive.toLowerCase() === "true";
     }
 
-    //  Find campaign
     const campaign = await Campaign.findById(id);
-
     if (!campaign) {
       return res.status(404).json({ message: "Campaign not found" });
     }
 
-    //  Update and save
+    // ✅ Update status
     campaign.isActive = isActive;
     await campaign.save();
 
+    // ✅ fetch updated campaign
+    const updatedCampaign = await Campaign.findById(id);
+
     return res.status(200).json({
-      message: `Campaign has been ${isActive ? "activated" : "deactivated"} successfully`,
-      campaign,
+      message: Campaign has been ${isActive ? "activated" : "deactivated"} successfully,
+      campaign: updatedCampaign,
     });
 
   } catch (error) {
@@ -673,7 +674,6 @@ export const updateCampaignStatus = async (req, res) => {
     return res.status(500).json({ message: "Server error", error: error.message });
   }
 };
-
 
 /* ======================================================
    FETCH ALL EMPLOYEES
