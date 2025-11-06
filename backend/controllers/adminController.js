@@ -46,6 +46,50 @@ export const loginAdmin = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+/* ======================================================
+   UPDATE CAMPAIGN DETAILS
+   PUT /admin/campaigns/:id
+====================================================== */
+export const updateCampaignDetails = async (req, res) => {
+  try {
+    // Only admin can update campaign
+    if (!req.user || req.user.role !== "admin") {
+      return res.status(403).json({
+        message: "Only admins can update campaign details"
+      });
+    }
+
+    const { id } = req.params;
+    const { name, client, type, region, state } = req.body;
+
+    // Find campaign first
+    const campaign = await Campaign.findById(id);
+    if (!campaign) {
+      return res.status(404).json({ message: "Campaign not found" });
+    }
+
+    // Update only fields provided
+    if (name) campaign.name = name;
+    if (client) campaign.client = client;
+    if (type) campaign.type = type;
+    if (region) campaign.region = region;
+    if (state) campaign.state = state;
+
+    await campaign.save();
+
+    res.status(200).json({
+      message: "Campaign updated successfully",
+      campaign
+    });
+
+  } catch (error) {
+    console.error("Update campaign error:", error);
+    return res.status(500).json({
+      message: "Server error",
+      error: error.message
+    });
+  }
+};
 
 /* ======================================================
    ADD NEW ADMIN
