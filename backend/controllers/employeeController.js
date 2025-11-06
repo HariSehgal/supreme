@@ -1,12 +1,149 @@
 import jwt from "jsonwebtoken";
 import { Employee, Campaign } from "../models/user.js";
 
+import bcrypt  from "bcryptjs"; 
+
+
+
+export const updateEmployeeProfile = async (req, res) => {
+  try {
+    const { id } = req.user; // from JWT
+    const employee = await Employee.findById(id);
+    if (!employee) return res.status(404).json({ message: "Employee not found" });
+
+    // 🔹 Parse normal text fields (employeeType excluded)
+    const {
+      gender,
+      dob,
+      highestQualification,
+      maritalStatus,
+      fathersName,
+      fatherDob,
+      motherName,
+      motherDob,
+      spouseName,
+      spouseDob,
+      child1Name,
+      child1Dob,
+      child2Name,
+      child2Dob,
+      alternatePhone,
+      aadhaarNumber,
+      panNumber,
+      uanNumber,
+      esiNumber,
+      pfNumber,
+      esiDispensary,
+      contractLength,
+      newPassword,
+    } = req.body;
+
+    Object.assign(employee, {
+      gender,
+      dob,
+      highestQualification,
+      maritalStatus,
+      fathersName,
+      fatherDob,
+      motherName,
+      motherDob,
+      spouseName,
+      spouseDob,
+      child1Name,
+      child1Dob,
+      child2Name,
+      child2Dob,
+      alternatePhone,
+      aadhaarNumber,
+      panNumber,
+      uanNumber,
+      esiNumber,
+      pfNumber,
+      esiDispensary,
+      contractLength,
+    });
+
+    // 🔹 Parse nested JSON strings safely
+    if (req.body.correspondenceAddress) {
+      employee.correspondenceAddress = JSON.parse(req.body.correspondenceAddress);
+    }
+    if (req.body.permanentAddress) {
+      employee.permanentAddress = JSON.parse(req.body.permanentAddress);
+    }
+    if (req.body.bankDetails) {
+      employee.bankDetails = JSON.parse(req.body.bankDetails);
+    }
+    if (req.body.experiences) {
+      employee.experiences = JSON.parse(req.body.experiences);
+    }
+
+    // 🔹 Handle uploaded files (store buffer + contentType)
+    const files = req.files || {};
+    if (!employee.files) employee.files = {};
+
+    const fileFields = [
+      "aadhaarFront",
+      "aadhaarBack",
+      "panCard",
+      "personPhoto",
+      "familyPhoto",
+      "bankProof",
+      "esiForm",
+      "pfForm",
+      "employmentForm",
+      "cv",
+    ];
+
+    fileFields.forEach((field) => {
+      if (files[field]) {
+        employee.files[field] = {
+          data: files[field][0].buffer,
+          contentType: files[field][0].mimetype,
+        };
+      }
+    });
+
+    // 🔹 Password update (optional)
+    if (newPassword && newPassword.trim().length >= 6) {
+      employee.password = await bcrypt.hash(newPassword, 10);
+    }
+
+    // 🔹 Mark first login as complete
+    employee.isFirstLogin = false;
+
+    await employee.save();
+
+    res.status(200).json({
+      message: "Profile updated successfully",
+      employee: {
+        id: employee._id,
+        name: employee.name,
+        email: employee.email,
+        phone: employee.phone,
+        isFirstLogin: employee.isFirstLogin,
+      },
+    });
+  } catch (error) {
+    console.error("❌ Error updating employee profile:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+``
 /* ===============================
    LOGIN EMPLOYEE
 =============================== */
 export const loginEmployee = async (req, res) => {
   try {
-    const { email, phone } = req.body;
+    const { email, phone, password } = req.body;
+
+    if (!email && !phone) {
+      return res.status(400).json({ message: "Email or phone is required" });
+    }
+
+    if (!password) {
+      return res.status(400).json({ message: "Password is required" });
+    }
 
     const employee = await Employee.findOne({
       $or: [{ email }, { phone }],
@@ -16,6 +153,13 @@ export const loginEmployee = async (req, res) => {
       return res.status(404).json({ message: "Employee not found" });
     }
 
+    // Compare entered password
+    const isMatch = await bcrypt.compare(password, employee.password);
+    if (!isMatch) {
+      return res.status(401).json({ message: "Invalid credentials" });
+    }
+
+    // Generate token
     const token = jwt.sign(
       { id: employee._id, role: "employee" },
       process.env.JWT_SECRET || "supremeSecretKey",
@@ -30,6 +174,7 @@ export const loginEmployee = async (req, res) => {
         name: employee.name,
         email: employee.email,
         phone: employee.phone,
+        isFirstLogin: employee.isFirstLogin,
       },
     });
   } catch (error) {
