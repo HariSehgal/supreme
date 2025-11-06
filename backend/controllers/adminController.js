@@ -686,7 +686,10 @@ export const getAllEmployees = async (req, res) => {
 ====================================================== */
 export const getAllRetailers = async (req, res) => {
   try {
-    const retailers = await Retailer.find().select("_id name contactNo");
+    const retailers = await Retailer.find().select(
+      "_id name contactNo shopDetails.shopAddress.state shopDetails.businessType"
+    );
+
     res.status(200).json({ retailers });
   } catch (err) {
     console.error("Get retailers error:", err);
