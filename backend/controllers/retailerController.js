@@ -173,16 +173,41 @@ export const registerRetailer = async (req, res) => {
 =============================== */
 export const loginRetailer = async (req, res) => {
   try {
-    const { contactNo } = req.body;
-    if (!contactNo) return res.status(400).json({ message: "Phone number required" });
+    const { contactNo, email } = req.body;
 
-    const retailer = await Retailer.findOne({ contactNo });
-    if (!retailer) return res.status(400).json({ message: "Retailer not found" });
+    // ✅ Both required
+    if (!contactNo || !email) {
+      return res.status(400).json({
+        message: "Email and phone number are both required",
+      });
+    }
+
+    // ✅ Find retailer using both fields
+    const retailer = await Retailer.findOne({
+      email,
+      contactNo,
+    });
+
+    if (!retailer)
+      return res.status(400).json({ message: "Retailer not found" });
+
     if (!retailer.phoneVerified)
       return res.status(400).json({ message: "Phone not verified" });
 
+    // ✅ Ensure JWT_SECRET exists
+    if (!process.env.JWT_SECRET) {
+      console.error("JWT_SECRET missing in environment variables");
+      return res.status(500).json({ message: "Server configuration error" });
+    }
+
+    // ✅ JWT
     const token = jwt.sign(
-      { id: retailer._id, contactNo: retailer.contactNo, role: "retailer" },
+      {
+        id: retailer._id,
+        contactNo: retailer.contactNo,
+        email: retailer.email,
+        role: "retailer",
+      },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
@@ -199,10 +224,11 @@ export const loginRetailer = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Login error:", error);
+    console.error("Retailer login error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+
 
 /* ===============================
    GET RETAILER PROFILE
