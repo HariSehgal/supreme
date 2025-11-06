@@ -7,6 +7,7 @@ import {
   addClientAdmin,
   addClientUser,
   loginClientAdmin,
+  updateCampaignDetails,
 registerRetailer,  
   // Forgot / Reset Password controllers
   forgotPassword,
@@ -91,6 +92,7 @@ router.post("/campaigns/assign", protect, assignCampaign);
 router.post("/campaigns/payment", protect, updateCampaignPayment);
 router.get("/admin/career/jobs/:id", protect, getSingleAdminJob);
 router.patch("/campaigns/:id/status", protect, updateCampaignStatus);
+router.put("/campaigns/:id", protect, updateCampaignDetails);
 
 /* ===========================================================
    JOB MANAGEMENT ROUTES
