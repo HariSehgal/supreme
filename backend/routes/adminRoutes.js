@@ -76,7 +76,7 @@ router.post(
   upload.fields([
     { name: "govtIdPhoto", maxCount: 1 },
     { name: "personPhoto", maxCount: 1 },
-    { name: "signature", maxCount: 1 },
+    { name: "registrationForm", maxCount: 1 },
     { name: "outletPhoto", maxCount: 1 },
   ]),
   registerRetailer
