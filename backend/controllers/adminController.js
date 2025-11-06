@@ -689,12 +689,28 @@ export const registerRetailer = async (req, res) => {
 
     const { contactNo, email } = body;
 
-    if (!email || !contactNo)
-      return res
-        .status(400)
-        .json({ message: "Email and contact number are required" });
+    if (!email || !contactNo) {
+      return res.status(400).json({
+        message: "Email and contact number are required",
+      });
+    }
 
-    // ✅ Personal Address (flat from frontend)
+    /* ======================================================
+       1️⃣ CHECK FOR EXISTING EMAIL / PHONE
+    ====================================================== */
+    const existingRetailer = await Retailer.findOne({
+      $or: [{ contactNo }, { email }],
+    });
+
+    if (existingRetailer) {
+      return res.status(400).json({
+        message: "Phone number or email already registered",
+      });
+    }
+
+    /* ======================================================
+       2️⃣ BUILD ADDRESS, SHOP DETAILS, BANK DETAILS
+    ====================================================== */
     const personalAddress = {
       address: body.address,
       city: body.city,
@@ -705,7 +721,6 @@ export const registerRetailer = async (req, res) => {
       },
     };
 
-    // ✅ Shop Address
     const shopAddress = {
       address: body["shopDetails.shopAddress.address"] || body.address,
       address2: body.address2 || "",
@@ -718,7 +733,6 @@ export const registerRetailer = async (req, res) => {
       },
     };
 
-    // ✅ Shop Details
     const shopDetails = {
       shopName: body["shopDetails.shopName"] || body.shopName,
       businessType: body["shopDetails.businessType"] || body.businessType,
@@ -736,7 +750,6 @@ export const registerRetailer = async (req, res) => {
         : undefined,
     };
 
-    // ✅ Bank Details
     const bankDetails = {
       bankName: body["bankDetails.bankName"] || body.bankName,
       accountNumber: body["bankDetails.accountNumber"] || body.accountNumber,
@@ -744,17 +757,9 @@ export const registerRetailer = async (req, res) => {
       branchName: body["bankDetails.branchName"] || body.branchName,
     };
 
-    // ✅ Check existing retailer
-    const existingRetailer = await Retailer.findOne({
-      $or: [{ contactNo }, { email }],
-    });
-
-    if (existingRetailer)
-      return res
-        .status(400)
-        .json({ message: "Phone or email already registered" });
-
-    // ✅ Create new retailer
+    /* ======================================================
+       3️⃣ CREATE RETAILER OBJECT
+    ====================================================== */
     const retailer = new Retailer({
       name: body.name,
       contactNo,
@@ -794,8 +799,26 @@ export const registerRetailer = async (req, res) => {
       partOfIndia: body.partOfIndia || "N",
     });
 
-    await retailer.save();
+    /* ======================================================
+       4️⃣ SAVE WITH E11000 (duplicate key) HANDLING
+    ====================================================== */
+    try {
+      await retailer.save();
+    } catch (err) {
+      if (err.code === 11000) {
+        const dupField = Object.keys(err.keyValue)[0];
+        return res.status(400).json({
+          message: `${dupField} already exists`,
+          duplicateField: dupField,
+          value: err.keyValue[dupField],
+        });
+      }
+      throw err;
+    }
 
+    /* ======================================================
+       ✅ SUCCESS
+    ====================================================== */
     res.status(201).json({
       message: "Retailer registered successfully",
       uniqueId: retailer.uniqueId,
@@ -805,6 +828,7 @@ export const registerRetailer = async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+
 /* ======================================================
    ADMIN FETCHES ALL PAYMENTS FOR A CAMPAIGN
 ====================================================== */
