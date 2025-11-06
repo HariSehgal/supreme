@@ -299,18 +299,30 @@ export const deleteCampaign = async (req, res) => {
 ====================================================== */
 export const addEmployee = async (req, res) => {
   try {
-    const { name, email, contactNo, gender, address, dob } = req.body;
+    const { name, email, contactNo, gender, address, dob, employeeType } = req.body;
 
-    if (!req.user || req.user.role !== "admin")
+  
+    if (!req.user || req.user.role !== "admin") {
       return res.status(403).json({ message: "Only admins can add employees" });
+    }
 
-    if (!name || !email || !contactNo)
+   
+    if (!name || !email || !contactNo) {
       return res.status(400).json({ message: "All fields are required" });
+    }
 
+  
     const existing = await Employee.findOne({ email });
-    if (existing)
+    if (existing) {
       return res.status(409).json({ message: "Employee already exists" });
+    }
 
+    let validEmployeeType = null;
+    if (employeeType && ["Permanent", "Contractual"].includes(employeeType)) {
+      validEmployeeType = employeeType;
+    }
+
+    
     const newEmployee = new Employee({
       name,
       email,
@@ -318,14 +330,26 @@ export const addEmployee = async (req, res) => {
       gender,
       address,
       dob,
-      organization: req.user.id,
+      password: contactNo, 
+      createdByAdmin: req.user.id,
+      employeeType: validEmployeeType,
     });
 
     await newEmployee.save();
-    res.status(201).json({ message: "Employee added successfully", employee: newEmployee });
+
+    res.status(201).json({
+      message: "Employee added successfully",
+      employee: {
+        id: newEmployee._id,
+        name: newEmployee.name,
+        email: newEmployee.email,
+        phone: newEmployee.phone,
+        employeeType: newEmployee.employeeType,
+      },
+    });
   } catch (error) {
     console.error("Add employee error:", error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
