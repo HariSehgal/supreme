@@ -334,15 +334,30 @@ const campaignSchema = new Schema(
       enum: ["Retailer Enrolment", "Display Payment", "Incentive Payment", "Others"],
       required: true,
     },
-    region: { type: String, enum: ["North", "South", "East", "West", "All"], required: true },
+    region: {
+      type: String,
+      enum: ["North", "South", "East", "West", "All"],
+      required: true,
+    },
     state: { type: String, required: true },
+
     createdBy: { type: Types.ObjectId, ref: "Admin", required: true },
+
+    //  New field added
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
 
     // Assigned Retailers
     assignedRetailers: [
       {
         retailerId: { type: Types.ObjectId, ref: "Retailer", required: true },
-        status: { type: String, enum: ["pending", "accepted", "rejected"], default: "pending" },
+        status: {
+          type: String,
+          enum: ["pending", "accepted", "rejected"],
+          default: "pending",
+        },
         assignedAt: { type: Date, default: Date.now },
         updatedAt: { type: Date },
       },
@@ -352,7 +367,11 @@ const campaignSchema = new Schema(
     assignedEmployees: [
       {
         employeeId: { type: Types.ObjectId, ref: "Employee" },
-        status: { type: String, enum: ["pending", "accepted", "rejected"], default: "pending" },
+        status: {
+          type: String,
+          enum: ["pending", "accepted", "rejected"],
+          default: "pending",
+        },
         assignedAt: { type: Date, default: Date.now },
         updatedAt: { type: Date },
       },
@@ -360,6 +379,7 @@ const campaignSchema = new Schema(
   },
   { timestamps: true }
 );
+
 const paymentSchema = new mongoose.Schema(
   {
     retailer: {
