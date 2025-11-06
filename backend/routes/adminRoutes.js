@@ -24,6 +24,7 @@ registerRetailer,
   assignCampaign,
   updateCampaignPayment,
 getSingleAdminJob,
+  getCampaignById,
   // Employee & Retailer controllers
   addEmployee,
   bulkAddEmployees,
@@ -93,7 +94,7 @@ router.post("/campaigns/payment", protect, updateCampaignPayment);
 router.get("/admin/career/jobs/:id", protect, getSingleAdminJob);
 router.patch("/campaigns/:id/status", protect, updateCampaignStatus);
 router.put("/campaigns/:id", protect, updateCampaignDetails);
-
+router.get("/campaigns/:id", protect, getCampaignById);
 /* ===========================================================
    JOB MANAGEMENT ROUTES
 =========================================================== */
