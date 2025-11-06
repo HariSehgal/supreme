@@ -196,16 +196,132 @@ export const Retailer = model("Retailer", retailerSchema);
 =============================== */
 const employeeSchema = new Schema(
   {
+    // -------- Basic Account Info (set by Admin) --------
     name: { type: String, required: true },
     email: { type: String, required: true, unique: true },
     phone: { type: String, required: true },
     password: { type: String },
-    gender: String,
-    address: String,
-    dob: Date,
+    isFirstLogin: { type: Boolean, default: true },
+
+    // Linked organization/admin
     organization: { type: Schema.Types.ObjectId, ref: "ClientAdmin" },
     createdByAdmin: { type: Schema.Types.ObjectId, ref: "Admin" },
-    isFirstLogin: { type: Boolean, default: true },
+
+    // -------- Employee Type --------
+    employeeType: {
+      type: String,
+      enum: ["Permanent", "Contractual"],
+      required: false,
+    },
+
+    // -------- Personal Details --------
+    gender: String,
+    dob: Date,
+    highestQualification: String,
+    maritalStatus: String,
+    fathersName: String,
+    fatherDob: Date,
+    motherName: String,
+    motherDob: Date,
+    spouseName: String,
+    spouseDob: Date,
+    child1Name: String,
+    child1Dob: Date,
+    child2Name: String,
+    child2Dob: Date,
+    alternatePhone: String,
+
+    // -------- Address Details --------
+    correspondenceAddress: {
+      addressLine1: String,
+      addressLine2: String,
+      city: String,
+      state: String,
+      pincode: String,
+    },
+    permanentAddress: {
+      addressLine1: String,
+      addressLine2: String,
+      city: String,
+      state: String,
+      pincode: String,
+    },
+
+    // -------- Identification Details --------
+    aadhaarNumber: String,
+    panNumber: String,
+    uanNumber: String,
+    esiNumber: String,
+    pfNumber: String,
+    esiDispensary: String,
+
+    // -------- Bank Details --------
+    bankDetails: {
+      accountNumber: String,
+      ifsc: String,
+      bankName: String,
+      branchName: String,
+    },
+
+    // -------- Contractual Specific --------
+    contractLength: String, // e.g., "6 months" or "1 year"
+
+    // -------- Work Experience --------
+    experiences: [
+      {
+        organization: String,
+        designation: String,
+        from: Date,
+        to: Date,
+        currentlyWorking: { type: Boolean, default: false },
+      },
+    ],
+
+    // -------- Uploaded Files (updated structure) --------
+    files: {
+      aadhaarFront: {
+        data: Buffer,
+        contentType: String,
+      },
+      aadhaarBack: {
+        data: Buffer,
+        contentType: String,
+      },
+      panCard: {
+        data: Buffer,
+        contentType: String,
+      },
+      personPhoto: {
+        data: Buffer,
+        contentType: String,
+      },
+      familyPhoto: {
+        data: Buffer,
+        contentType: String,
+      },
+      bankProof: {
+        data: Buffer,
+        contentType: String,
+      },
+      esiForm: {
+        data: Buffer,
+        contentType: String,
+      },
+      pfForm: {
+        data: Buffer,
+        contentType: String,
+      },
+      employmentForm: {
+        data: Buffer,
+        contentType: String,
+      },
+      cv: {
+        data: Buffer,
+        contentType: String,
+      },
+    },
+
+    // -------- Campaign Assignment --------
     assignedCampaigns: [
       {
         type: Schema.Types.ObjectId,
@@ -216,8 +332,12 @@ const employeeSchema = new Schema(
   { timestamps: true }
 );
 
+/* ===========================
+   PASSWORD HASH MIDDLEWARE
+=========================== */
 employeeSchema.pre("save", async function (next) {
   try {
+    // Auto-hash password only when employee is newly created
     if (this.isNew && this.phone) {
       this.password = await bcrypt.hash(this.phone.toString(), 10);
       this.isFirstLogin = true;
@@ -227,8 +347,11 @@ employeeSchema.pre("save", async function (next) {
     next(err);
   }
 });
-export const Employee = model("Employee", employeeSchema);
 
+/* ===========================
+   EXPORT MODEL
+=========================== */
+export const Employee = model("Employee", employeeSchema);
 /* ===============================
    CAMPAIGN SCHEMA
 =============================== */
