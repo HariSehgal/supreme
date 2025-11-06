@@ -84,19 +84,20 @@ export const addAdmin = async (req, res) => {
 ====================================================== */
 export const addClientAdmin = async (req, res) => {
   try {
-    const { name, email, contactNo, organizationName, password } = req.body;
+    const { name, email, contactNo, organizationName } = req.body;
 
     if (!req.user || req.user.role !== "admin")
       return res.status(403).json({ message: "Only admins can add client admins" });
 
-    if (!name || !email || !organizationName || !password)
+    if (!name || !email || !organizationName || !contactNo)
       return res.status(400).json({ message: "Missing required fields" });
 
     const existing = await ClientAdmin.findOne({ email });
     if (existing)
       return res.status(409).json({ message: "Client admin already exists" });
 
-    const hashedPass = await bcrypt.hash(password, 10);
+    //  Password = contactNo (phone number)
+    const hashedPass = await bcrypt.hash(contactNo.toString(), 10);
 
     const newClientAdmin = new ClientAdmin({
       name,
@@ -111,6 +112,7 @@ export const addClientAdmin = async (req, res) => {
     });
 
     await newClientAdmin.save();
+
     res.status(201).json({
       message: "Client admin created successfully",
       clientAdmin: newClientAdmin,
@@ -120,6 +122,7 @@ export const addClientAdmin = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
 
 /* ======================================================
    ADD CLIENT USER
