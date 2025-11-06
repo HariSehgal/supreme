@@ -665,7 +665,7 @@ export const updateCampaignStatus = async (req, res) => {
     const updatedCampaign = await Campaign.findById(id);
 
     return res.status(200).json({
-      message: Campaign has been ${isActive ? "activated" : "deactivated"} successfully,
+      message: `Campaign has been ${isActive ? "activated" : "deactivated"} successfully`,
       campaign: updatedCampaign,
     });
 
