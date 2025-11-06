@@ -554,6 +554,40 @@ export const assignCampaign = async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+//update the campaign
+export const updateCampaignStatus = async (req, res) => {
+  try {
+    if (!req.user || req.user.role !== "admin") {
+      return res.status(403).json({ message: "Only admins can update campaign status" });
+    }
+
+    const { id } = req.params;
+    const { isActive } = req.body;
+
+    if (isActive === undefined) {
+      return res.status(400).json({ message: "isActive field is required (true/false)" });
+    }
+
+    //  Find campaign
+    const campaign = await Campaign.findById(id);
+    if (!campaign) {
+      return res.status(404).json({ message: "Campaign not found" });
+    }
+
+    //  Update status
+    campaign.isActive = isActive;
+    await campaign.save();
+
+    res.status(200).json({
+      message: `Campaign ${isActive ? "activated" : "deactivated"} successfully`,
+      campaign,
+    });
+
+  } catch (error) {
+    console.error("Update campaign status error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
 
 /* ======================================================
    FETCH ALL EMPLOYEES
