@@ -4,19 +4,19 @@ import { motion } from "framer-motion";
 import networkImg from "/map.png";
 
 const stats = [
-  { value: 16, suffix: "+", label: "States • All 4 Metros" },
-  { value: 42, suffix: "+", label: "Cities Covered" },
-  { value: 1000, suffix: "+", label: "Promoters & Merchandisers" },
-  { value: 500, suffix: "+", label: "Sales Men" },
+  { value: 24, suffix: "+", label: "States • All 4 Metros" },
+  { value: 142, suffix: "+", label: "Cities Covered" },
+  { value: 1542, suffix: "+", label: "Promoters & Merchandisers" },
+  { value: 469, suffix: "+", label: "Sales Men" },
 ];
 
 const OurNetwork = () => {
   return (
-    <section className="bg-gradient-to-b from-black via-gray-900 to-red-950 text-white py-10 px-6 md:px-20">
+    <section className="bg-black text-white py-4 px-6 md:px-20">
       <div className="max-w-7xl mx-auto">
 
         {/* Heading */}
-        <div className="text-center mb-14">
+        <div className="text-center mb-10">
           <h2 className="text-4xl md:text-5xl font-extrabold mb-3">
             Our <span className="text-red-500">Network</span>
           </h2>
@@ -40,7 +40,7 @@ const OurNetwork = () => {
             <img
               src={networkImg}
               alt="Our Network"
-              className="w-full max-w-md md:max-w-lg object-contain h-[320px] md:h-[480px] drop-shadow-[0_0_25px_rgba(228,0,43,0.3)]"
+              className="w-full max-w-md md:max-w-lg object-contain h-[320px] md:h-[480px]"
             />
           </motion.div>
 
@@ -57,22 +57,20 @@ const OurNetwork = () => {
                 key={index}
                 whileHover={{ y: -5, scale: 1.03 }}
                 transition={{ duration: 0.3 }}
-                className="bg-black rounded-2xl border border-red-600/30 p-6 text-center shadow-[0_0_20px_rgba(228,0,43,0.2)] hover:shadow-[0_0_35px_rgba(228,0,43,0.4)] transition-all duration-300"
+                className="bg-white rounded-2xl border-[5px] border-red-600 p-6 text-center shadow-[0_0_20px_rgba(228,0,43,0.2)] hover:shadow-[0_0_35px_rgba(228,0,43,0.4)] transition-all duration-300 box-border flex flex-col justify-center items-center h-[150px]"
               >
-                <h3 className="text-4xl md:text-5xl font-extrabold text-red-500">
+                <h3 className="text-4xl md:text-5xl font-extrabold text-red-500 leading-none">
                   <CountUp
                     start={0}
                     end={item.value}
-                    duration={2}
+                    duration={6}
                     suffix={item.suffix}
                     enableScrollSpy
                   >
-                    {({ countUpRef }) => (
-                      <span ref={countUpRef}></span>
-                    )}
+                    {({ countUpRef }) => <span ref={countUpRef}></span>}
                   </CountUp>
                 </h3>
-                <p className="mt-2 text-gray-200 font-semibold text-sm md:text-base">
+                <p className="mt-2 text-black font-semibold text-sm md:text-base whitespace-nowrap overflow-hidden text-ellipsis">
                   {item.label}
                 </p>
               </motion.div>
@@ -80,6 +78,7 @@ const OurNetwork = () => {
           </motion.div>
         </div>
       </div>
+      <div className="border-b border-gray-700 mx-auto mt-20"></div>
     </section>
   );
 };

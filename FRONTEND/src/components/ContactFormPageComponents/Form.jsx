@@ -4,11 +4,33 @@ import {
   FaPhoneAlt,
   FaEnvelope,
   FaCity,
+  FaRegEdit,
 } from "react-icons/fa";
 import { FiMail, FiPhone, FiMapPin } from "react-icons/fi";
+import { IoChevronDown, IoClose } from "react-icons/io5";
 
 const ContactForm = () => {
   const [showOtpBox, setShowOtpBox] = useState(false);
+  const [subject, setSubject] = useState("");
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const subjectOptions = [
+    "Complaint",
+    "Suggestion",
+    "Business Query",
+    "Others",
+  ];
+
+  const filteredOptions = subjectOptions.filter((opt) =>
+    opt.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const handleSelect = (value) => {
+    setSubject(value);
+    setDropdownOpen(false);
+    setSearchTerm("");
+  };
 
   return (
     <section className="min-h-[80vh] bg-gradient-to-b from-black via-gray-900 to-black text-white flex justify-center items-center py-10 px-6 mt-20">
@@ -54,7 +76,6 @@ const ContactForm = () => {
           <form className="space-y-4">
             {/* Name & City */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Full Name */}
               <div>
                 <label className="block text-xs font-semibold mb-1 text-gray-300">
                   Full Name
@@ -73,7 +94,6 @@ const ContactForm = () => {
                 </div>
               </div>
 
-              {/* City */}
               <div>
                 <label className="block text-xs font-semibold mb-1 text-gray-300">
                   City
@@ -93,7 +113,7 @@ const ContactForm = () => {
               </div>
             </div>
 
-            {/* Phone with Verify link */}
+            {/* Phone with Verify */}
             <div>
               <label className="block text-xs font-semibold mb-1 text-gray-300">
                 Phone Number
@@ -109,13 +129,13 @@ const ContactForm = () => {
                   className="w-full pl-9 pr-20 py-2 rounded-md bg-gray-800/80 text-white placeholder-gray-400 border border-gray-700 focus:outline-none focus:ring-2 focus:ring-red-500 transition text-sm"
                   required
                 />
-                <button
+                {/* <button
                   type="button"
                   onClick={() => setShowOtpBox(true)}
                   className="absolute right-2 top-1/2 -translate-y-1/2 text-red-500 text-xs font-semibold hover:underline cursor-pointer"
                 >
                   Verify
-                </button>
+                </button> */}
               </div>
             </div>
 
@@ -136,6 +156,56 @@ const ContactForm = () => {
                   required
                 />
               </div>
+            </div>
+
+            {/* Subject - Searchable Dropdown */}
+            <div className="relative">
+              <label className="block text-xs font-semibold mb-1 text-gray-300">
+                Subject
+              </label>
+              <div
+                className="relative cursor-pointer"
+                onClick={() => setDropdownOpen((prev) => !prev)}
+              >
+                <FaRegEdit
+                  size={14}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                />
+                <input
+                  type="text"
+                  placeholder="Select or search subject"
+                  value={dropdownOpen ? searchTerm : subject}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  readOnly={!dropdownOpen}
+                  className="w-full pl-9 pr-8 py-2 rounded-md bg-gray-800/80 text-white placeholder-gray-400 border border-gray-700 focus:outline-none focus:ring-2 focus:ring-red-500 transition text-sm"
+                  required
+                />
+                <IoChevronDown
+                  size={16}
+                  className={`absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 transition-transform duration-200 ${
+                    dropdownOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </div>
+
+              {/* Dropdown List */}
+              {dropdownOpen && (
+                <div className="absolute z-20 w-full bg-gray-800 border border-gray-700 rounded-md mt-1 max-h-40 overflow-y-auto shadow-lg">
+                  {filteredOptions.length > 0 ? (
+                    filteredOptions.map((option, index) => (
+                      <div
+                        key={index}
+                        onClick={() => handleSelect(option)}
+                        className="px-3 py-2 text-sm hover:bg-red-600 cursor-pointer"
+                      >
+                        {option}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="px-3 py-2 text-gray-400 text-sm">No match found</div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Message */}

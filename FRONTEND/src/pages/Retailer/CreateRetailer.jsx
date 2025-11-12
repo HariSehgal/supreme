@@ -10,6 +10,8 @@ import {
     FaTimes,
 } from "react-icons/fa";
 import { IoClose } from "react-icons/io5";
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 const SearchableSelect = ({ label, placeholder, options, value, onChange }) => {
     const [open, setOpen] = useState(false);
@@ -156,7 +158,7 @@ const FileInput = ({ label, accept = "*", file, setFile }) => {
     );
 };
 
-const SignUp = () => {
+const CreateRetailer = () => {
     // Personal details
     const [name, setName] = useState("");
     const [contactNo, setContactNo] = useState("");
@@ -324,78 +326,142 @@ const SignUp = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-
-        const body = {
-            name,
-            contactNo,
-            altContactNo,
-            email,
-            dob,
-            gender,
-            govtIdType,
-            govtIdNumber,
-            shopDetails: {
-                shopName,
-                businessType,
-                ownershipType,
-                GSTNo: gstNo,
-                PANCard: panCard,
-                shopAddress: {
-                    addressLine1: address1,
-                    addressLine2: address2,
-                    city,
-                    state,
-                    pincode,
-                },
-            },
-            bankDetails: {
-                bankName,
-                accountNumber,
-                IFSC: ifsc,
-                branchName,
-            },
-            files: {
-                govtIdPhoto: govtIdPhoto?.name || null,
-                personPhoto: personPhoto?.name || null,
-                registrationForm: registrationFormFile?.name || null,
-                outletPhoto: outletPhoto?.name || null,
-            },
-        };
-
         setSubmitting(true);
+
         try {
-            console.log("Submitting JSON body:", JSON.stringify(body, null, 2));
-            await new Promise((res) => setTimeout(res, 600));
-            alert("Form submitted! Check console for JSON body (replace with real API request).");
-        } catch (err) {
-            console.error(err);
-            alert("Submission failed.");
-        } finally {
-            setSubmitting(false);
+            const token = localStorage.getItem("token");
+
+            const formData = new FormData();
+
+            // ✅ Required personal info
+            formData.append("name", name);
+            formData.append("contactNo", contactNo);
+            formData.append("email", email);
+            formData.append("dob", dob);
+            formData.append("gender", gender);
+            formData.append("govtIdType", govtIdType);
+            formData.append("govtIdNumber", govtIdNumber);
+
+            // ✅ Optional
+            formData.append("altContactNo", altContactNo || "");
+
+            // ✅ Personal address
+            formData.append("address", address1);
+            formData.append("city", city);
+            formData.append("state", state);
+            formData.append("geoTags.lat", "0");
+            formData.append("geoTags.lng", "0");
+
+            // ✅ Shop Details
+            formData.append("shopDetails.shopName", shopName);
+            formData.append("shopDetails.businessType", businessType);
+            formData.append("shopDetails.ownershipType", ownershipType);
+            formData.append("shopDetails.GSTNo", gstNo);
+            formData.append("shopDetails.PANCard", panCard);
+            formData.append("shopDetails.dateOfEstablishment", "");
+            formData.append("shopDetails.shopAddress.address", address1);
+            formData.append("shopDetails.shopAddress.city", city);
+            formData.append("shopDetails.shopAddress.state", state);
+            formData.append("shopDetails.shopAddress.geoTags.lat", "0");
+            formData.append("shopDetails.shopAddress.geoTags.lng", "0");
+
+            // ✅ Bank Details
+            formData.append("bankDetails.bankName", bankName);
+            formData.append("bankDetails.accountNumber", accountNumber);
+            formData.append("bankDetails.IFSC", ifsc);
+            formData.append("bankDetails.branchName", branchName);
+
+            // ✅ Files
+            if (govtIdPhoto) formData.append("govtIdPhoto", govtIdPhoto.raw);
+            if (personPhoto) formData.append("personPhoto", personPhoto.raw);
+            if (registrationFormFile)
+                formData.append("registrationForm", registrationFormFile.raw);
+            if (outletPhoto) formData.append("outletPhoto", outletPhoto.raw);
+
+            // ✅ Defaults
+            formData.append("createdBy", "AdminAdded");
+            formData.append("partOfIndia", "N");
+
+            const response = await fetch(
+                "https://supreme-419p.onrender.com/api/admin/retailers",
+                {
+                    method: "POST",
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                    body: formData,
+                }
+            );
+
+            let data = {};
+            try {
+                data = await response.json();
+            } catch {
+                console.log("⚠ No JSON body returned");
+            }
+
+            if (!response.ok) {
+                console.error("❌ API Error:", data); // ✅ PRINT ERROR IN CONSOLE
+                toast.error(data.message || "Error registering retailer", {
+                    theme: "dark",
+                });
+            } else {
+                toast.success("✅ Retailer created successfully!", {
+                    theme: "dark",
+                });
+
+                resetForm();
+            }
+        } catch (error) {
+            console.error("❌ Network/Server error:", error); // ✅ PRINT ERROR IN CONSOLE
+            toast.error("Server error", { theme: "dark" });
         }
+
+        setSubmitting(false);
+    };
+
+    const resetForm = () => {
+        setName("");
+        setContactNo("");
+        setAltContactNo("");
+        setEmail("");
+        setDob("");
+        setGender("");
+        setGovtIdType("");
+        setGovtIdNumber("");
+        setShopName("");
+        setBusinessType("");
+        setOwnershipType("");
+        setGstNo("");
+        setPanCard("");
+        setAddress1("");
+        setAddress2("");
+        setCity("");
+        setState("");
+        setPincode("");
+        setBankName("");
+        setAccountNumber("");
+        setIfsc("");
+        setBranchName("");
+
+        setGovtIdPhoto(null);
+        setPersonPhoto(null);
+        setRegistrationFormFile(null);
+        setOutletPhoto(null);
     };
 
     return (
         <>
-            {/* Navbar */}
-            <nav className="fixed top-0 w-full z-50 bg-white shadow-md px-6 md:px-10">
-                <div className="flex justify-between items-center py-4 max-w-screen-xl mx-auto">
-                    <img src="cpLogo.png" alt="Logo" className="h-14 cursor-pointer" />
-                    <h2 className="absolute left-1/2 transform -translate-x-1/2 text-xl md:text-2xl font-bold text-[#E4002B]">
-                        Retailer Registration Page
-                    </h2>
-                </div>
-            </nav>
-
+            <ToastContainer />
             {/* Retailer Registration Form */}
-            <div className="min-h-screen bg-white px-4 pt-28 pb-10">
-                <div className="max-w-3xl mx-auto bg-white shadow rounded-lg p-6">
-                    <h2 className="text-2xl font-semibold mb-4 text-center">Retailer Registration</h2>
+            <div className="flex justify-center items-center w-full">
+                <div className="w-full max-w-3xl bg-white shadow-md rounded-xl p-8">
+                    <h1 className="text-2xl font-bold text-[#E4002B] text-center pb-8">Retailer Registration</h1>
 
                     <form onSubmit={handleSubmit} className="space-y-6">
                         {/* Personal Details */}
                         <section className="space-y-4">
-                            <h3 className="text-lg font-medium">Personal Details</h3>
+                            <h3 className="text-lg font-medium text-[#E4002B]">Personal Details</h3>
 
                             <div>
                                 <label className="block text-sm font-medium mb-1">
@@ -434,7 +500,7 @@ const SignUp = () => {
 
                             <div>
                                 <label className="block text-sm font-medium mb-1">
-                                    Alternate Contact No 
+                                    Alternate Contact No
                                 </label>
                                 <div className="relative">
                                     <FaPhoneAlt className="absolute left-3 top-3 text-gray-400" />
@@ -528,7 +594,7 @@ const SignUp = () => {
 
                         {/* Shop Details */}
                         <section className="space-y-4">
-                            <h3 className="text-lg font-medium">Shop Details</h3>
+                            <h3 className="text-lg font-medium text-[#E4002B]">Shop Details</h3>
 
                             <div>
                                 <label className="block text-sm font-medium mb-1">
@@ -720,7 +786,7 @@ const SignUp = () => {
 
                         {/* Bank Details */}
                         <section className="space-y-4">
-                            <h3 className="text-lg font-medium">Bank Details</h3>
+                            <h3 className="text-lg font-medium text-[#E4002B]">Bank Details</h3>
 
                             <SearchableSelect
                                 label={
@@ -781,7 +847,7 @@ const SignUp = () => {
                         {/* File Uploads */}
                         <section className="space-y-4">
                             <div>
-                                <h3 className="text-lg font-medium">File Uploads</h3>
+                                <h3 className="text-lg font-medium text-[#E4002B]">File Uploads</h3>
                                 <p className="text-[11px] text-gray-500 mt-1">
                                     <span className="text-red-500">*</span> Accepted formats: PNG, JPG, JPEG, PDF, DOC — less than 1 MB
                                 </p>
@@ -813,7 +879,7 @@ const SignUp = () => {
                                 <FileInput
                                     label={
                                         <>
-                                            Registration Form 
+                                            Registration Form
                                         </>
                                     }
                                     accept=".png,.jpg,.jpeg,.pdf,.doc"
@@ -840,7 +906,7 @@ const SignUp = () => {
                                 disabled={submitting}
                                 className="w-full bg-[#E4002B] text-white py-3 rounded-lg font-medium hover:bg-[#C3002B] transition disabled:opacity-60"
                             >
-                                {submitting ? "Submitting..." : "Submit Registration"}
+                                {submitting ? "Creating..." : "Create Retailer"}
                             </button>
                         </div>
                     </form>
@@ -850,4 +916,4 @@ const SignUp = () => {
     );
 };
 
-export default SignUp;
+export default CreateRetailer;

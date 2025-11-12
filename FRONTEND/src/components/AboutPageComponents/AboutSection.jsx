@@ -5,7 +5,7 @@ const AboutSection = () => {
   return (
     <>
       {/* Who We Are */}
-      <section className="pt-32 pb-16 bg-black text-center md:text-left px-6 md:px-32 flex flex-col md:flex-row items-center gap-12">
+      <section className="bg-gradient-to-t from-black via-gray-900 to-red-950 pt-32 pb-16 text-center md:text-left px-6 md:px-32 flex flex-col md:flex-row items-center gap-12">
         {/* Image (Left) */}
         <motion.div
           initial={{ opacity: 0, x: -30 }}
@@ -42,7 +42,7 @@ const AboutSection = () => {
       <div className="w-[70%] border-b border-gray-700 mx-auto"></div>
 
       {/* What We Do */}
-      <section className="pt-16 pb-24 bg-black text-center md:text-left px-6 md:px-32 flex flex-col md:flex-row-reverse items-center gap-12">
+      <section className="pt-16 pb-16 text-center md:text-left px-6 md:px-32 flex flex-col md:flex-row-reverse items-center gap-12">
         {/* Image (Right) */}
         <motion.div
           initial={{ opacity: 0, x: 30 }}

@@ -11,11 +11,11 @@ const SignIn = () => {
       <nav className="fixed top-0 w-full z-50 bg-white shadow-md transition-all duration-300 ease-in-out px-6 md:px-10">
         <div className="flex justify-between items-center py-4 max-w-screen-xl mx-auto">
           {/* Logo on left */}
-          <img src="cpLogo.png" alt="Logo" className="h-14 cursor-pointer" />
+          <img src="cpLogo.jpg" alt="Logo" className="h-14 cursor-pointer" />
 
           {/* Center Heading */}
           <h2 className="absolute left-1/2 transform -translate-x-1/2 text-xl md:text-2xl font-bold text-[#E4002B]">
-            Retailer Login Page
+            Employee Login Page
           </h2>
         </div>
       </nav>
@@ -71,7 +71,7 @@ const SignIn = () => {
             </div>
 
             {/* Login Button */}
-            <Link to="/retailer-dashboard">
+            <Link to="/employee-dashboard">
               <button
                 type="button"
                 className="w-full bg-[#E4002B] text-white py-2 rounded-lg font-medium hover:bg-[#C3002B] transition"

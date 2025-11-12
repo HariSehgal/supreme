@@ -105,19 +105,9 @@ const BulkUpload = () => {
 
   return (
     <>
-      {/* Navbar */}
-      <nav className="fixed top-0 w-full z-50 bg-white shadow-md px-6 md:px-10">
-        <div className="flex justify-between items-center py-4 max-w-screen-xl mx-auto relative">
-          <img src="cpLogo.png" alt="Logo" className="h-14 cursor-pointer" />
-          <h2 className="absolute left-1/2 transform -translate-x-1/2 text-xl md:text-2xl font-bold text-[#E4002B]">
-            Bulk Upload Page
-          </h2>
-        </div>
-      </nav>
-
-      <div className="min-h-screen flex flex-col justify-center items-center bg-gray-50 pt-28 px-4">
+      <div className="min-h-screen flex flex-col justify-start items-center bg-gray-50 px-4">
         <div className="bg-white shadow-md rounded-xl p-8 w-full max-w-lg text-center">
-          <h1 className="text-2xl font-semibold text-gray-800 mb-4">
+          <h1 className="text-2xl font-semibold mb-4 text-[#E4002B]">
             Upload Bulk Data
           </h1>
           <p className="text-gray-600 mb-6">

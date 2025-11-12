@@ -18,7 +18,7 @@ const SignUp = () => {
         <div className="flex justify-between items-center py-4 max-w-screen-xl mx-auto">
           {/* Logo on left */}
           <img
-            src="cpLogo.png"
+            src="cpLogo.jpg"
             alt="Logo"
             className="h-14 cursor-pointer"
           />
