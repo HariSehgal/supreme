@@ -14,6 +14,7 @@ import crypto from "crypto";
 import nodemailer from "nodemailer";
 import XLSX from "xlsx";
 import { CareerApplication,Job, JobApplication } from "../models/user.js";
+import mongoose from "mongoose";
 /* ======================================================
    ADMIN LOGIN
 ====================================================== */
@@ -46,76 +47,6 @@ export const loginAdmin = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
-/* ======================================================
-   UPDATE CAMPAIGN DETAILS
-   PUT /admin/campaigns/:id
-====================================================== */
-export const updateCampaignDetails = async (req, res) => {
-  try {
-    // Only admin can update campaign
-    if (!req.user || req.user.role !== "admin") {
-      return res.status(403).json({
-        message: "Only admins can update campaign details"
-      });
-    }
-
-    const { id } = req.params;
-    const { name, client, type, region, state } = req.body;
-
-    // Find campaign first
-    const campaign = await Campaign.findById(id);
-    if (!campaign) {
-      return res.status(404).json({ message: "Campaign not found" });
-    }
-
-    // Update only fields provided
-    if (name) campaign.name = name;
-    if (client) campaign.client = client;
-    if (type) campaign.type = type;
-    if (region) campaign.region = region;
-    if (state) campaign.state = state;
-
-    await campaign.save();
-
-    res.status(200).json({
-      message: "Campaign updated successfully",
-      campaign
-    });
-
-  } catch (error) {
-    console.error("Update campaign error:", error);
-    return res.status(500).json({
-      message: "Server error",
-      error: error.message
-    });
-  }
-};
-// get campaign by id
-export const getCampaignById = async (req, res) => {
-  try {
-    if (!req.user || req.user.role !== "admin") {
-      return res.status(403).json({
-        message: "Only admins can view campaign details"
-      });
-    }
-
-    const { id } = req.params;
-
-    const campaign = await Campaign.findById(id);
-    if (!campaign) {
-      return res.status(404).json({ message: "Campaign not found" });
-    }
-
-    res.status(200).json({ campaign });
-  } catch (error) {
-    console.error("Get campaign by ID error:", error);
-    res.status(500).json({
-      message: "Server error",
-      error: error.message
-    });
-  }
-};
-
 
 /* ======================================================
    ADD NEW ADMIN
@@ -154,20 +85,19 @@ export const addAdmin = async (req, res) => {
 ====================================================== */
 export const addClientAdmin = async (req, res) => {
   try {
-    const { name, email, contactNo, organizationName } = req.body;
+    const { name, email, contactNo, organizationName, password } = req.body;
 
     if (!req.user || req.user.role !== "admin")
       return res.status(403).json({ message: "Only admins can add client admins" });
 
-    if (!name || !email || !organizationName || !contactNo)
+    if (!name || !email || !organizationName || !password)
       return res.status(400).json({ message: "Missing required fields" });
 
     const existing = await ClientAdmin.findOne({ email });
     if (existing)
       return res.status(409).json({ message: "Client admin already exists" });
 
-    //  Password = contactNo (phone number)
-    const hashedPass = await bcrypt.hash(contactNo.toString(), 10);
+    const hashedPass = await bcrypt.hash(password, 10);
 
     const newClientAdmin = new ClientAdmin({
       name,
@@ -182,7 +112,6 @@ export const addClientAdmin = async (req, res) => {
     });
 
     await newClientAdmin.save();
-
     res.status(201).json({
       message: "Client admin created successfully",
       clientAdmin: newClientAdmin,
@@ -192,7 +121,104 @@ export const addClientAdmin = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+//
+export const registerRetailer = async (req, res) => {
+  try {
+    const body = req.body;
+    const files = req.files || {};
+    const { contactNo, email } = body;
 
+    if (!email || !contactNo)
+      return res.status(400).json({ message: "Email and contact number are required" });
+
+    const personalAddress = {
+      address: body.address,
+      city: body.city,
+      state: body.state,
+      geoTags: {
+        lat: parseFloat(body.geoTags?.lat) || 0,
+        lng: parseFloat(body.geoTags?.lng) || 0,
+      },
+    };
+
+    const shopAddress = {
+      address: body["shopDetails.shopAddress.address"] || body.shopAddress,
+      city: body["shopDetails.shopAddress.city"] || body.shopCity,
+      state: body["shopDetails.shopAddress.state"] || body.shopState,
+      geoTags: {
+        lat: parseFloat(body["shopDetails.shopAddress.geoTags.lat"]) || 0,
+        lng: parseFloat(body["shopDetails.shopAddress.geoTags.lng"]) || 0,
+      },
+    };
+
+    const shopDetails = {
+      shopName: body["shopDetails.shopName"] || body.shopName,
+      businessType: body["shopDetails.businessType"] || body.businessType,
+      ownershipType: body["shopDetails.ownershipType"] || body.ownershipType,
+      dateOfEstablishment: body["shopDetails.dateOfEstablishment"] || body.dateOfEstablishment,
+      GSTNo: body["shopDetails.GSTNo"] || body.GSTNo,
+      PANCard: body["shopDetails.PANCard"] || body.PANCard,
+      shopAddress,
+      outletPhoto: files.outletPhoto
+        ? { data: files.outletPhoto[0].buffer, contentType: files.outletPhoto[0].mimetype }
+        : undefined,
+    };
+
+    const bankDetails = {
+      bankName: body["bankDetails.bankName"] || body.bankName,
+      accountNumber: body["bankDetails.accountNumber"] || body.accountNumber,
+      IFSC: body["bankDetails.IFSC"] || body.IFSC,
+      branchName: body["bankDetails.branchName"] || body.branchName,
+    };
+
+    // Check if email or phone already exists
+    const existingRetailer = await Retailer.findOne({
+      $or: [{ contactNo }, { email }],
+    });
+    if (existingRetailer)
+      return res.status(400).json({ message: "Phone or email already registered" });
+
+    const retailer = new Retailer({
+      name: body.name,
+      contactNo,
+      email,
+      dob: body.dob,
+      gender: body.gender,
+      govtIdType: body.govtIdType,
+      govtIdNumber: body.govtIdNumber,
+      govtIdPhoto: files.govtIdPhoto
+        ? { data: files.govtIdPhoto[0].buffer, contentType: files.govtIdPhoto[0].mimetype }
+        : undefined,
+      personPhoto: files.personPhoto
+        ? { data: files.personPhoto[0].buffer, contentType: files.personPhoto[0].mimetype }
+        : undefined,
+      signature: files.signature
+        ? { data: files.signature[0].buffer, contentType: files.signature[0].mimetype }
+        : undefined,
+      personalAddress,
+      shopDetails,
+      bankDetails,
+
+     
+      createdBy: body.createdBy || "AdminAdded",
+
+      
+      phoneVerified: true,
+
+      partOfIndia: body.partOfIndia || "N",
+    });
+
+    await retailer.save();
+
+    res.status(201).json({
+      message: "Retailer registered successfully",
+      uniqueId: retailer.uniqueId,
+    });
+  } catch (error) {
+    console.error("Retailer registration error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
 
 /* ======================================================
    ADD CLIENT USER
@@ -310,14 +336,32 @@ export const addCampaign = async (req, res) => {
       type,
       region,
       state,
+      campaignStartDate,
+      campaignEndDate
     } = req.body;
 
+    // Admin auth check
     if (!req.user || req.user.role !== "admin")
       return res.status(403).json({ message: "Only admins can create campaigns" });
 
+    // Required fields validation
     if (!name || !client || !type || !region || !state)
       return res.status(400).json({ message: "All fields are required" });
 
+    // Date validation
+    if (!campaignStartDate || !campaignEndDate)
+      return res.status(400).json({ message: "Campaign start and end date are required" });
+
+    const start = new Date(campaignStartDate);
+    const end = new Date(campaignEndDate);
+
+    if (isNaN(start) || isNaN(end))
+      return res.status(400).json({ message: "Invalid date format" });
+
+    if (start > end)
+      return res.status(400).json({ message: "Start date cannot be after end date" });
+
+    // Create campaign
     const campaign = new Campaign({
       name,
       client,
@@ -325,15 +369,84 @@ export const addCampaign = async (req, res) => {
       region,
       state,
       createdBy: req.user.id,
+      campaignStartDate: start,
+      campaignEndDate: end,
     });
 
     await campaign.save();
-    res.status(201).json({ message: "Campaign created successfully", campaign });
+
+    res.status(201).json({
+      message: "Campaign created successfully",
+      campaign
+    });
+
   } catch (error) {
     console.error("Add campaign error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
+
+/* ======================================================
+   UPDATE CAMPAIGN STATUS (Activate / Deactivate)
+   PATCH /admin/campaigns/:id/status
+====================================================== */
+export const updateCampaignStatus = async (req, res) => {
+  try {
+    if (!req.user || req.user.role !== "admin") {
+      return res.status(403).json({ message: "Only admins can update campaign status" });
+    }
+
+    const { id } = req.params;
+    const { isActive } = req.body;
+
+    if (isActive === undefined) {
+      return res.status(400).json({ message: "isActive field is required (true/false)" });
+    }
+
+    //  Find campaign
+    const campaign = await Campaign.findById(id);
+    if (!campaign) {
+      return res.status(404).json({ message: "Campaign not found" });
+    }
+
+    //  Update status
+    campaign.isActive = isActive;
+    await campaign.save();
+
+    res.status(200).json({
+      message: `Campaign ${isActive ? "activated" : "deactivated"} successfully`,
+      campaign,
+    });
+
+  } catch (error) {
+    console.error("Update campaign status error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+/* ======================================================
+   GET SINGLE CAMPAIGN BY ID
+   GET /api/admin/campaigns/:id
+====================================================== */
+export const getCampaignById = async (req, res) => {
+  try {
+    if (!req.user || req.user.role !== "admin") {
+      return res.status(403).json({ message: "Only admins can view campaign details" });
+    }
+
+    const { id } = req.params;
+
+    const campaign = await Campaign.findById(id);
+    if (!campaign) {
+      return res.status(404).json({ message: "Campaign not found" });
+    }
+
+    res.status(200).json({ campaign });
+  } catch (error) {
+    console.error("Get campaign by ID error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 
 export const getAllCampaigns = async (req, res) => {
   try {
@@ -374,28 +487,29 @@ export const addEmployee = async (req, res) => {
   try {
     const { name, email, contactNo, gender, address, dob, employeeType } = req.body;
 
-  
+    // Check if the user is admin
     if (!req.user || req.user.role !== "admin") {
       return res.status(403).json({ message: "Only admins can add employees" });
     }
 
-   
+    //  Required field validation
     if (!name || !email || !contactNo) {
       return res.status(400).json({ message: "All fields are required" });
     }
 
-  
+    // Check existing employee
     const existing = await Employee.findOne({ email });
     if (existing) {
       return res.status(409).json({ message: "Employee already exists" });
     }
 
+    //  Only admin can assign employeeType
     let validEmployeeType = null;
     if (employeeType && ["Permanent", "Contractual"].includes(employeeType)) {
       validEmployeeType = employeeType;
     }
 
-    
+    //  Create employee (password = phone)
     const newEmployee = new Employee({
       name,
       email,
@@ -403,7 +517,7 @@ export const addEmployee = async (req, res) => {
       gender,
       address,
       dob,
-      password: contactNo, 
+      password: contactNo, // auto-hashed in pre-save hook
       createdByAdmin: req.user.id,
       employeeType: validEmployeeType,
     });
@@ -477,33 +591,7 @@ export const bulkAddEmployees = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
-//single admin
 
-export const getSingleAdminJob = async (req, res) => {
-  try {
-    // ✅ Ensure user is logged in
-    if (!req.user || !req.user.id)
-      return res.status(401).json({ message: "Not authorized, please log in" });
-
-    // ✅ Verify user exists in Admin collection
-    const admin = await Admin.findById(req.user.id);
-    if (!admin)
-      return res.status(403).json({ message: "Only registered admins can view job details" });
-
-    const { id } = req.params;
-
-    // ✅ Find the job (allow all jobs if multiple admins manage jobs)
-    const job = await Job.findById(id);
-
-    if (!job)
-      return res.status(404).json({ message: "Job not found" });
-
-    res.status(200).json({ job });
-  } catch (error) {
-    console.error("Get single admin job error:", error);
-    res.status(500).json({ message: "Server error" });
-  }
-};
 /* ======================================================
    ASSIGN CAMPAIGN TO EMPLOYEES & RETAILERS
 ====================================================== */
@@ -511,7 +599,7 @@ export const assignCampaign = async (req, res) => {
   try {
     const { campaignId, employeeIds = [], retailerIds = [] } = req.body;
 
-    // Ensure only admins can assign campaigns
+    // Admin check
     if (!req.user || req.user.role !== "admin")
       return res.status(403).json({ message: "Only admins can assign campaigns" });
 
@@ -519,34 +607,39 @@ export const assignCampaign = async (req, res) => {
       return res.status(400).json({ message: "Campaign ID is required" });
 
     const campaign = await Campaign.findById(campaignId);
-    if (!campaign) return res.status(404).json({ message: "Campaign not found" });
+    if (!campaign)
+      return res.status(404).json({ message: "Campaign not found" });
 
-    // Initialize arrays if undefined
-    campaign.assignedEmployees = campaign.assignedEmployees || [];
-    campaign.assignedRetailers = campaign.assignedRetailers || [];
+    // Default inherited dates
+    const startDate = campaign.campaignStartDate;
+    const endDate = campaign.campaignEndDate;
 
-    // ======================
-    // Assign Employees
-    // ======================
+    // Ensure arrays
+    campaign.assignedEmployees ||= [];
+    campaign.assignedRetailers ||= [];
+
+    // ==========================
+    // ASSIGN EMPLOYEES
+    // ==========================
     for (const empId of employeeIds) {
       if (!empId) continue;
 
-      // Check if already assigned (works for both objects and plain ObjectIds)
-      const existingIndex = campaign.assignedEmployees.findIndex(e => {
-        const id = e.employeeId ? e.employeeId : e;
-        return id.toString() === empId.toString();
-      });
+      const existingIndex = campaign.assignedEmployees.findIndex(e =>
+        (e.employeeId || e).toString() === empId.toString()
+      );
 
       if (existingIndex === -1) {
-        // Not assigned yet — add as object with default status
+        // New Assignment
         campaign.assignedEmployees.push({
           employeeId: empId,
           status: "pending",
           assignedAt: new Date(),
           updatedAt: new Date(),
+          startDate,
+          endDate,
         });
       } else {
-        // Already assigned but may be a plain ObjectId — normalize
+        // Normalize legacy entry
         const entry = campaign.assignedEmployees[existingIndex];
         if (!entry.employeeId) {
           campaign.assignedEmployees[existingIndex] = {
@@ -554,35 +647,40 @@ export const assignCampaign = async (req, res) => {
             status: "pending",
             assignedAt: new Date(),
             updatedAt: new Date(),
+            startDate,
+            endDate,
           };
         }
       }
 
-      // Link campaign in Employee model
+      // Add in Employee model
       await Employee.findByIdAndUpdate(empId, {
         $addToSet: { assignedCampaigns: campaign._id },
       });
     }
 
-    // ======================
-    // Assign Retailers
-    // ======================
+    // ==========================
+    // ASSIGN RETAILERS
+    // ==========================
     for (const retId of retailerIds) {
       if (!retId) continue;
 
-      const existingIndex = campaign.assignedRetailers.findIndex(r => {
-        const id = r.retailerId ? r.retailerId : r;
-        return id.toString() === retId.toString();
-      });
+      const existingIndex = campaign.assignedRetailers.findIndex(r =>
+        (r.retailerId || r).toString() === retId.toString()
+      );
 
       if (existingIndex === -1) {
+        // New Assignment
         campaign.assignedRetailers.push({
           retailerId: retId,
           status: "pending",
           assignedAt: new Date(),
           updatedAt: new Date(),
+          startDate,
+          endDate,
         });
       } else {
+        // Normalize legacy entry
         const entry = campaign.assignedRetailers[existingIndex];
         if (!entry.retailerId) {
           campaign.assignedRetailers[existingIndex] = {
@@ -590,16 +688,18 @@ export const assignCampaign = async (req, res) => {
             status: "pending",
             assignedAt: new Date(),
             updatedAt: new Date(),
+            startDate,
+            endDate,
           };
         }
       }
 
-      // Link campaign in Retailer model
+      // Add in Retailer model
       await Retailer.findByIdAndUpdate(retId, {
         $addToSet: { assignedCampaigns: campaign._id },
       });
 
-      // ===== Create Payment document if not exists =====
+      // Create Payment Record If Needed
       const existingPayment = await Payment.findOne({
         campaign: campaign._id,
         retailer: retId,
@@ -609,7 +709,7 @@ export const assignCampaign = async (req, res) => {
         await Payment.create({
           campaign: campaign._id,
           retailer: retId,
-          totalAmount: 0,      // default total amount (can be updated later)
+          totalAmount: 0,
           amountPaid: 0,
           paymentStatus: "Pending",
         });
@@ -627,47 +727,82 @@ export const assignCampaign = async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
-//update the campaign
-export const updateCampaignStatus = async (req, res) => {
+export const updateRetailerDates = async (req, res) => {
   try {
-    if (!req.user || req.user.role !== "admin") {
-      return res.status(403).json({
-        message: "Only admins can update campaign status",
-      });
-    }
+    const { campaignId, retailerId } = req.params;
+    const { startDate, endDate } = req.body;
 
-    const { id } = req.params;
-    let { isActive } = req.body;
+    // admin check
+    if (!req.user || req.user.role !== "admin")
+      return res.status(403).json({ message: "Only admin can update dates" });
 
-    if (isActive === undefined || isActive === null) {
-      return res.status(400).json({
-        message: "isActive field is required (true/false)",
-      });
-    }
-
-    // Convert string → boolean
-    if (typeof isActive === "string") {
-      isActive = isActive.toLowerCase() === "true";
-    }
-
-    const campaign = await Campaign.findById(id);
-    if (!campaign) {
+    const campaign = await Campaign.findById(campaignId);
+    if (!campaign)
       return res.status(404).json({ message: "Campaign not found" });
-    }
 
-    campaign.isActive = isActive;
+    const retailerEntry = campaign.assignedRetailers.find(
+      r => r.retailerId.toString() === retailerId.toString()
+    );
+
+    if (!retailerEntry)
+      return res.status(404).json({ message: "Retailer not assigned to this campaign" });
+
+    // Update only if values are provided
+    if (startDate) retailerEntry.startDate = new Date(startDate);
+    if (endDate) retailerEntry.endDate = new Date(endDate);
+    retailerEntry.updatedAt = new Date();
+
     await campaign.save();
 
-    return res.status(200).json({
-      message:` Campaign has been ${isActive ? "activated" : "deactivated"} successfully`,
-      campaign,
+    res.status(200).json({
+      message: "Retailer dates updated successfully",
+      retailer: retailerEntry
     });
 
-  } catch (error) {
-    console.error("Update campaign status error:", error);
-    return res.status(500).json({ message: "Server error", error: error.message });
+  } catch (err) {
+    console.error("Retailer date update error:", err);
+    res.status(500).json({ message: "Server error", error: err.message });
   }
 };
+
+export const updateEmployeeDates = async (req, res) => {
+  try {
+    const { campaignId, employeeId } = req.params;
+    const { startDate, endDate } = req.body;
+
+    if (!req.user || req.user.role !== "admin")
+      return res.status(403).json({ message: "Only admin can update dates" });
+
+    const campaign = await Campaign.findById(campaignId);
+    if (!campaign)
+      return res.status(404).json({ message: "Campaign not found" });
+
+    const employeeEntry = campaign.assignedEmployees.find(
+      e => e.employeeId.toString() === employeeId.toString()
+    );
+
+    if (!employeeEntry)
+      return res.status(404).json({ message: "Employee not assigned to this campaign" });
+
+    // Update only provided fields
+    if (startDate) employeeEntry.startDate = new Date(startDate);
+    if (endDate) employeeEntry.endDate = new Date(endDate);
+    employeeEntry.updatedAt = new Date();
+
+    await campaign.save();
+
+    res.status(200).json({
+      message: "Employee dates updated successfully",
+      employee: employeeEntry
+    });
+
+  } catch (err) {
+    console.error("Employee date update error:", err);
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
+};
+
+
 /* ======================================================
    FETCH ALL EMPLOYEES
 ====================================================== */
@@ -686,10 +821,7 @@ export const getAllEmployees = async (req, res) => {
 ====================================================== */
 export const getAllRetailers = async (req, res) => {
   try {
-    const retailers = await Retailer.find().select(
-      "_id name contactNo shopDetails.shopAddress.state shopDetails.businessType"
-    );
-
+    const retailers = await Retailer.find().select("_id name contactNo");
     res.status(200).json({ retailers });
   } catch (err) {
     console.error("Get retailers error:", err);
@@ -761,152 +893,6 @@ export const updateCampaignPayment = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
-export const registerRetailer = async (req, res) => {
-  try {
-    const body = req.body;
-    const files = req.files || {};
-
-    const { contactNo, email } = body;
-
-    if (!email || !contactNo) {
-      return res.status(400).json({
-        message: "Email and contact number are required",
-      });
-    }
-
-    /* ======================================================
-       1️⃣ CHECK FOR EXISTING EMAIL / PHONE
-    ====================================================== */
-    const existingRetailer = await Retailer.findOne({
-      $or: [{ contactNo }, { email }],
-    });
-
-    if (existingRetailer) {
-      return res.status(400).json({
-        message: "Phone number or email already registered",
-      });
-    }
-
-    /* ======================================================
-       2️⃣ BUILD ADDRESS, SHOP DETAILS, BANK DETAILS
-    ====================================================== */
-    const personalAddress = {
-      address: body.address,
-      city: body.city,
-      state: body.state,
-      geoTags: {
-        lat: parseFloat(body["geoTags.lat"]) || 0,
-        lng: parseFloat(body["geoTags.lng"]) || 0,
-      },
-    };
-
-    const shopAddress = {
-      address: body["shopDetails.shopAddress.address"] || body.address,
-      address2: body.address2 || "",
-      city: body["shopDetails.shopAddress.city"] || body.city,
-      state: body["shopDetails.shopAddress.state"] || body.state,
-      pincode: body.pincode,
-      geoTags: {
-        lat: parseFloat(body["shopDetails.shopAddress.geoTags.lat"]) || 0,
-        lng: parseFloat(body["shopDetails.shopAddress.geoTags.lng"]) || 0,
-      },
-    };
-
-    const shopDetails = {
-      shopName: body["shopDetails.shopName"] || body.shopName,
-      businessType: body["shopDetails.businessType"] || body.businessType,
-      ownershipType: body["shopDetails.ownershipType"] || body.ownershipType,
-      GSTNo: body["shopDetails.GSTNo"] || body.GSTNo,
-      PANCard: body["shopDetails.PANCard"] || body.PANCard,
-      dateOfEstablishment:
-        body["shopDetails.dateOfEstablishment"] || body.dateOfEstablishment,
-      shopAddress,
-      outletPhoto: files.outletPhoto
-        ? {
-            data: files.outletPhoto[0].buffer,
-            contentType: files.outletPhoto[0].mimetype,
-          }
-        : undefined,
-    };
-
-    const bankDetails = {
-      bankName: body["bankDetails.bankName"] || body.bankName,
-      accountNumber: body["bankDetails.accountNumber"] || body.accountNumber,
-      IFSC: body["bankDetails.IFSC"] || body.IFSC,
-      branchName: body["bankDetails.branchName"] || body.branchName,
-    };
-
-    /* ======================================================
-       3️⃣ CREATE RETAILER OBJECT
-    ====================================================== */
-    const retailer = new Retailer({
-      name: body.name,
-      contactNo,
-      email,
-      dob: body.dob,
-      gender: body.gender,
-      govtIdType: body.govtIdType,
-      govtIdNumber: body.govtIdNumber,
-
-      govtIdPhoto: files.govtIdPhoto
-        ? {
-            data: files.govtIdPhoto[0].buffer,
-            contentType: files.govtIdPhoto[0].mimetype,
-          }
-        : undefined,
-
-      personPhoto: files.personPhoto
-        ? {
-            data: files.personPhoto[0].buffer,
-            contentType: files.personPhoto[0].mimetype,
-          }
-        : undefined,
-
-      registrationForm: files.registrationForm
-        ? {
-            data: files.registrationForm[0].buffer,
-            contentType: files.registrationForm[0].mimetype,
-          }
-        : undefined,
-
-      shopDetails,
-      bankDetails,
-      personalAddress,
-
-      createdBy: body.createdBy || "AdminAdded",
-      phoneVerified: true,
-      partOfIndia: body.partOfIndia || "N",
-    });
-
-    /* ======================================================
-       4️⃣ SAVE WITH E11000 (duplicate key) HANDLING
-    ====================================================== */
-    try {
-      await retailer.save();
-    } catch (err) {
-      if (err.code === 11000) {
-        const dupField = Object.keys(err.keyValue)[0];
-        return res.status(400).json({
-          message: `${dupField} already exists`,
-          duplicateField: dupField,
-          value: err.keyValue[dupField],
-        });
-      }
-      throw err;
-    }
-
-    /* ======================================================
-       ✅ SUCCESS
-    ====================================================== */
-    res.status(201).json({
-      message: "Retailer registered successfully",
-      uniqueId: retailer.uniqueId,
-    });
-  } catch (error) {
-    console.error("Retailer registration error:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
-  }
-};
 
 /* ======================================================
    ADMIN FETCHES ALL PAYMENTS FOR A CAMPAIGN
@@ -937,7 +923,7 @@ export const createJobPosting = async (req, res) => {
 
     const { title, description, location, salaryRange, experienceRequired, employmentType, totalRounds } = req.body;
     if (!title || !description || !location)
-      return res.status(400).json({ message: "title, description and location are required" });
+      return res.status(400).json({ message: "title, description, and location are required" });
 
     const job = new Job({
       title,
@@ -963,6 +949,8 @@ export const createJobPosting = async (req, res) => {
    Get jobs created by admin
    GET /admin/career/jobs
 ====================================================== */
+
+
 export const getAdminJobs = async (req, res) => {
   try {
     if (!req.user || !req.user.id)
@@ -980,6 +968,153 @@ export const getAdminJobs = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
+
+/* ======================================================
+   Get applications for a specific job (admin)
+   GET /admin/career/jobs/:jobId/applications
+====================================================== */
+export const getJobApplications = async (req, res) => {
+  try {
+    if (!req.user || req.user.role !== "admin")
+      return res.status(403).json({ message: "Only admins can view applications" });
+
+    const { jobId } = req.params;
+    const job = await Job.findById(jobId);
+    if (!job) return res.status(404).json({ message: "Job not found" });
+    if (job.createdBy.toString() !== req.user.id)
+      return res.status(403).json({ message: "Not authorized to view applications for this job" });
+
+    const applications = await JobApplication.find({ job: jobId })
+      .populate("candidate", "fullName email phoneNumber")
+      .sort({ appliedAt: -1 });
+
+    res.status(200).json({ applications });
+  } catch (error) {
+    console.error("Get job applications error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+/* ======================================================
+   Update application status / round (admin)
+   PUT /admin/career/applications/:applicationId
+   body: { status?, currentRound? }
+====================================================== */
+
+/* ======================================================
+   UPDATE APPLICATION STATUS (ADMIN)
+   PATCH /api/admin/applications/:id/status
+====================================================== */
+/* ============================================================
+   UPDATE APPLICATION STATUS (Admin)
+============================================================ */
+export const updateApplicationStatus = async (req, res) => {
+  try {
+    const { applicationId } = req.params;
+    const { status, currentRound, totalRounds } = req.body;
+
+    if (!applicationId)
+      return res.status(400).json({ message: "Application ID is required" });
+
+    // 1️ Find the application
+    const application = await JobApplication.findById(applicationId)
+      .populate("candidate")
+      .populate("job");
+
+    if (!application)
+      return res.status(404).json({ message: "Application not found" });
+
+    // 2️ Update fields
+    if (status) application.status = status;
+    if (currentRound !== undefined) application.currentRound = currentRound;
+    if (totalRounds !== undefined) application.totalRounds = totalRounds;
+    await application.save();
+
+    const { fullName, email } = application.candidate;
+    const { title } = application.job;
+
+    // 3️ Prepare email content
+    const htmlContent = `
+      <h2>Application Status Updated</h2>
+      <p>Dear ${fullName},</p>
+      <p>Your application status for the position of <strong>${title}</strong> has been updated.</p>
+      <p><strong>Status:</strong> ${application.status}</p>
+      ${
+        application.currentRound
+          ? `<p><strong>Current Round:</strong> ${application.currentRound} / ${application.totalRounds}</p>`
+          : ""
+      }
+      <br/>
+      <p>Thank you for your continued interest.</p>
+      <p>Best regards,<br/>HR Team</p>
+    `;
+
+
+    if (process.env.NODE_ENV === "production") {
+      try {
+        const response = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            from: "Career Portal <onboarding@resend.dev>",
+            to: [email],
+            subject: `Application Update for ${title}`,
+            html: htmlContent,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(" Resend email failed:", errorText);
+        } else {
+          console.log(` Resend email sent successfully to ${email}`);
+        }
+      } catch (emailErr) {
+        console.error(" Resend error:", emailErr.message);
+      }
+    } else {
+      // 5️⃣ Use Gmail locally (for testing)
+      try {
+        const transporter = nodemailer.createTransport({
+          service: "gmail",
+          auth: {
+            user: process.env.EMAIL_USER,
+            pass: process.env.EMAIL_PASS,
+          },
+        });
+
+        await transporter.sendMail({
+          from: `"Career Portal" <${process.env.EMAIL_USER}>`,
+          to: email,
+          subject: `Application Update for ${title}`,
+          html: htmlContent,
+        });
+
+        console.log(` Local email sent to ${email}`);
+      } catch (emailErr) {
+        console.error(" Local email error:", emailErr.message);
+      }
+    }
+
+    // 6️⃣ Respond success
+    res.status(200).json({
+      message: "Application status updated and email notification sent.",
+      updatedApplication: application,
+    });
+  } catch (err) {
+    console.error(" Error updating application status:", err);
+    res.status(500).json({ message: "Internal server error", error: err.message });
+  }
+};
+/* ======================================================
+   Update or Change Status of a Job Posting
+   PUT /admin/career/jobs/:id
+   Body: { title?, description?, location?, salaryRange?, experienceRequired?, employmentType?, isActive? }
+====================================================== */
 /* ======================================================
    Update or Change Status of a Job Posting
    PUT /admin/career/jobs/:id
@@ -1025,166 +1160,36 @@ export const updateJobPosting = async (req, res) => {
     res.status(500).json({ message: error.message || "Server error" });
   }
 };
-/* ======================================================
-   Get applications for a specific job (admin)
-   GET /admin/career/jobs/:jobId/applications
-====================================================== */
-export const getJobApplications = async (req, res) => {
+export const getSingleAdminJob = async (req, res) => {
   try {
-    if (!req.user || req.user.role !== "admin")
-      return res.status(403).json({ message: "Only admins can view applications" });
+    
+    if (!req.user || !req.user.id)
+      return res.status(401).json({ message: "Not authorized, please log in" });
 
-    const { jobId } = req.params;
-    const job = await Job.findById(jobId);
-    if (!job) return res.status(404).json({ message: "Job not found" });
-    if (job.createdBy.toString() !== req.user.id)
-      return res.status(403).json({ message: "Not authorized to view applications for this job" });
+    
+    const admin = await Admin.findById(req.user.id);
+    if (!admin)
+      return res.status(403).json({ message: "Only registered admins can view job details" });
 
-    const applications = await JobApplication.find({ job: jobId })
-      .populate("candidate", "fullName email phoneNumber")
-      .sort({ appliedAt: -1 });
+    const { id } = req.params;
 
-    res.status(200).json({ applications });
+
+    const job = await Job.findById(id);
+
+    if (!job)
+      return res.status(404).json({ message: "Job not found" });
+
+    res.status(200).json({ job });
   } catch (error) {
-    console.error("Get job applications error:", error);
+    console.error("Get single admin job error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
-
-/* ======================================================
-   Update application status / round (admin)
-   PUT /admin/career/applications/:applicationId
-   body: { status?, currentRound? }
-====================================================== */
-
-/* ======================================================
-   UPDATE APPLICATION STATUS (ADMIN)
-   PATCH /api/admin/applications/:id/status
-====================================================== */
-/* ======================================================
-   UPDATE APPLICATION STATUS (ADMIN)
-   PATCH /api/admin/applications/:id/status
-====================================================== */
-export const updateApplicationStatus = async (req, res) => {
-  try {
-    const { id } = req.params; // Application ID
-    const { status, currentRound } = req.body;
-
-    // Role check
-    if (!req.user || req.user.role !== "admin") {
-      return res.status(403).json({ message: "Only admins can update application status" });
-    }
-
-    // Fetch application with candidate + job info
-    const application = await JobApplication.findById(id)
-      .populate("candidate", "fullName email")
-      .populate("job", "title totalRounds");
-
-    if (!application) {
-      return res.status(404).json({ message: "Application not found" });
-    }
-
-    // Update application fields
-    if (status) application.status = status;
-    if (currentRound !== undefined) {
-      if (currentRound > application.totalRounds)
-        return res.status(400).json({ message: "Current round exceeds total rounds" });
-      application.currentRound = currentRound;
-    }
-
-    application.updatedAt = new Date();
-    await application.save();
-
-    // Send status update email
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
-
-    const mailOptions = {
-      from: `"Supreme Careers" <${process.env.EMAIL_USER}>`,
-      to: application.candidate.email,
-      subject: `Application Update for ${application.job.title}`,
-      html: `
-        <p>Hi ${application.candidate.fullName},</p>
-        <p>Your application status for the position of <b>${application.job.title}</b> has been updated.</p>
-        <p><b>Status:</b> ${application.status}</p>
-        ${
-          currentRound
-            ? `<p><b>Current Round:</b> ${application.currentRound} / ${application.totalRounds}</p>`
-            : ""
-        }
-        <p>Thank you for your continued interest.</p>
-        <p>Best regards,<br>Supreme Careers Team</p>
-      `,
-    };
-
-    await transporter.sendMail(mailOptions);
-
-    return res.status(200).json({
-      message: "Application status updated successfully and email sent",
-      application,
-    });
-  } catch (error) {
-    console.error("Error updating application status:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
-  }
-};
-
-/* ======================================================
-   MAP JOBS TO APPLICATIONS FUNCTION
-====================================================== */
-export const mapJobToApplications = async (jobId = null) => {
-  try {
-    if (jobId) {
-      const applications = await JobApplication.find({ job: jobId }).select("_id");
-      await Job.findByIdAndUpdate(jobId, {
-        applications: applications.map((a) => a._id),
-      });
-      return { message: "Applications mapped to the specified job", jobId };
-    }
-
-    const jobs = await Job.find({}, "_id");
-    for (const job of jobs) {
-      const applications = await JobApplication.find({ job: job._id }).select("_id");
-      await Job.findByIdAndUpdate(job._id, {
-        applications: applications.map((a) => a._id),
-      });
-    }
-
-    return { message: "All jobs mapped successfully" };
-  } catch (error) {
-    console.error("Error mapping jobs to applications:", error);
-    throw new Error("Job-Application mapping failed");
-  }
-};
-
-/* ======================================================
-   MANUAL MAPPING ENDPOINT (ADMIN)
-====================================================== */
-export const syncJobApplications = async (req, res) => {
-  try {
-    if (!req.user || req.user.role !== "admin")
-      return res
-        .status(403)
-        .json({ message: "Only admins can perform this action" });
-
-    const { jobId } = req.params;
-    const result = await mapJobToApplications(jobId || null);
-    res.status(200).json(result);
-  } catch (error) {
-    console.error("Sync job applications error:", error);
-    res.status(500).json({ message: error.message });
-  }
-};
-
 /* ======================================================
    Admin download candidate resume
    GET /admin/career/applications/:applicationId/resume
 ====================================================== */
+
 export const getCandidateResume = async (req, res) => {
   try {
    
@@ -1240,6 +1245,7 @@ export const getCandidateResume = async (req, res) => {
     return res.status(500).json({ message: "Server error" });
   }
 };
+
 /* ======================================================
    ADMIN FORGOT PASSWORD
    POST /api/admin/forgot-password
