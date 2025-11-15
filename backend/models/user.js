@@ -329,56 +329,81 @@ const campaignSchema = new Schema(
   {
     name: { type: String, required: true, trim: true },
     client: { type: String, required: true, trim: true },
+
     type: {
       type: String,
       enum: ["Retailer Enrolment", "Display Payment", "Incentive Payment", "Others"],
       required: true,
     },
+
     region: {
       type: String,
       enum: ["North", "South", "East", "West", "All"],
       required: true,
     },
+
     state: { type: String, required: true },
 
     createdBy: { type: Types.ObjectId, ref: "Admin", required: true },
 
-    //  New field added
-    isActive: {
-      type: Boolean,
-      default: true,
-    },
+    // ---------------------------
+    // CAMPAIGN LEVEL DATE RANGE
+    // ---------------------------
+    campaignStartDate: { type: Date, required: true },
+    campaignEndDate: { type: Date, required: true },
 
-    // Assigned Retailers
+    // Campaign Active Status
+    isActive: { type: Boolean, default: true },
+
+    // ---------------------------
+    // ASSIGNED RETAILERS
+    // ---------------------------
     assignedRetailers: [
       {
         retailerId: { type: Types.ObjectId, ref: "Retailer", required: true },
+
         status: {
           type: String,
           enum: ["pending", "accepted", "rejected"],
           default: "pending",
         },
+
+        // Automatic timestamps
         assignedAt: { type: Date, default: Date.now },
         updatedAt: { type: Date },
+
+        // Each retailer can have their own date range
+        startDate: { type: Date },  // optional override
+        endDate: { type: Date },    // optional override
       },
     ],
 
-    // Assigned Employees
+    // ---------------------------
+    // ASSIGNED EMPLOYEES
+    // ---------------------------
     assignedEmployees: [
       {
         employeeId: { type: Types.ObjectId, ref: "Employee" },
+
         status: {
           type: String,
           enum: ["pending", "accepted", "rejected"],
           default: "pending",
         },
+
         assignedAt: { type: Date, default: Date.now },
         updatedAt: { type: Date },
+
+        // Optional employee-specific date override
+        startDate: { type: Date },
+        endDate: { type: Date },
       },
     ],
   },
   { timestamps: true }
 );
+
+
 
 const paymentSchema = new mongoose.Schema(
   {
