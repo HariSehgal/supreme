@@ -45,5 +45,14 @@ router.put("/employee/campaigns/:campaignId/status", protect, updateCampaignStat
 
 // 🔹 Client sets payment plan
 router.post("/client/campaigns/payment", protect, clientSetPaymentPlan);
+router.post(
+  "/reports/submit",
+  protect,
+  upload.fields([
+    { name: "images", maxCount: 20 },
+    { name: "billCopy", maxCount: 1 }
+  ]),
+  submitEmployeeReport
+);
 
 export default router;
