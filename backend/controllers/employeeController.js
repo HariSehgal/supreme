@@ -1,5 +1,5 @@
 import jwt from "jsonwebtoken";
-import { Employee, Campaign } from "../models/user.js";
+import { Employee, Campaign,submitEmployeeReport } from "../models/user.js";
 
 import bcrypt  from "bcryptjs"; 
 
@@ -373,7 +373,7 @@ export const submitEmployeeReport = async (req, res) => {
     });
 
     /* ----------------------------
-       🔥 Handle Images Upload
+       Handle Images Upload
     ---------------------------- */
     const files = req.files || {};
 
