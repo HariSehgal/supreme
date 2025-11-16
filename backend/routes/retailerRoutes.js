@@ -6,7 +6,8 @@ import {
   loginRetailer,
   getRetailerProfile,
   getRetailerCampaigns,
-  updateCampaignStatus, // ✅ newly added controller
+  updateCampaignStatus,
+    updateRetailer
 } from "../controllers/retailerController.js";
 import multer from "multer";
 import { protect } from "../middleware/authMiddleware.js"; // JWT middleware
@@ -33,12 +34,23 @@ router.post("/login", loginRetailer);
 
 // -------------------------------
 // PROTECTED ROUTES
-router.get("/profile/:id", protect, getRetailerProfile);
+router.get("/retailer/me",protect, getRetailerProfile);
 
 // Fetch only campaigns assigned to this retailer
 router.get("/campaigns", protect, getRetailerCampaigns);
 
-// ✅ Retailer accepts or rejects a campaign
+//  Retailer accepts or rejects a campaign
 router.put("/campaigns/:campaignId/status", protect, updateCampaignStatus);
+router.patch(
+  "/me",
+  protect,
+  upload.fields([
+    { name: "govtIdPhoto", maxCount: 1 },
+    { name: "personPhoto", maxCount: 1 },
+    { name: "signature", maxCount: 1 },
+    { name: "outletPhoto", maxCount: 1 }
+  ]),
+  updateRetailer
+);
 
 export default router;
