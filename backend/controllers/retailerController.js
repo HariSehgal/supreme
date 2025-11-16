@@ -175,14 +175,13 @@ export const loginRetailer = async (req, res) => {
   try {
     const { contactNo, email } = req.body;
 
-    // ✅ Both required
     if (!contactNo || !email) {
       return res.status(400).json({
         message: "Email and phone number are both required",
       });
     }
 
-    // ✅ Find retailer using both fields
+    
     const retailer = await Retailer.findOne({
       email,
       contactNo,
@@ -194,13 +193,13 @@ export const loginRetailer = async (req, res) => {
     if (!retailer.phoneVerified)
       return res.status(400).json({ message: "Phone not verified" });
 
-    // ✅ Ensure JWT_SECRET exists
+  
     if (!process.env.JWT_SECRET) {
       console.error("JWT_SECRET missing in environment variables");
       return res.status(500).json({ message: "Server configuration error" });
     }
 
-    // ✅ JWT
+
     const token = jwt.sign(
       {
         id: retailer._id,
@@ -228,6 +227,133 @@ export const loginRetailer = async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+/*
+   ## update retailer profile patch method  
+
+
+    
+*/
+export const updateRetailer = async (req, res) => {
+  try {
+    // 1️⃣ Read token
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) return res.status(401).json({ message: "Unauthorized: No token provided" });
+
+    // 2️⃣ Decode token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const retailerId = decoded.id;
+
+    // 3️⃣ Load the correct retailer (no param id)
+    const retailer = await Retailer.findById(retailerId);
+    if (!retailer) return res.status(404).json({ message: "Retailer not found" });
+
+    const body = req.body;
+    const files = req.files || {};
+
+    /* -------------------------------
+       BASIC FIELDS
+    ------------------------------- */
+    if (body.name) retailer.name = body.name;
+    if (body.email) retailer.email = body.email;
+    if (body.contactNo) retailer.contactNo = body.contactNo;
+    if (body.gender) retailer.gender = body.gender;
+    if (body.dob) retailer.dob = body.dob;
+
+    /* -------------------------------
+       PERSONAL ADDRESS
+    ------------------------------- */
+    if (body.address || body.city || body.state || body.lat || body.lng) {
+      retailer.personalAddress = {
+        address: body.address || retailer.personalAddress?.address,
+        city: body.city || retailer.personalAddress?.city,
+        state: body.state || retailer.personalAddress?.state,
+        geoTags: {
+          lat: body.lat ? parseFloat(body.lat) : retailer.personalAddress?.geoTags?.lat,
+          lng: body.lng ? parseFloat(body.lng) : retailer.personalAddress?.geoTags?.lng
+        }
+      };
+    }
+
+    /* -------------------------------
+       SHOP DETAILS
+    ------------------------------- */
+    if (body.shopName || body.businessType || body.ownershipType || body.dateOfEstablishment) {
+      retailer.shopDetails.shopName = body.shopName || retailer.shopDetails.shopName;
+      retailer.shopDetails.businessType = body.businessType || retailer.shopDetails.businessType;
+      retailer.shopDetails.ownershipType = body.ownershipType || retailer.shopDetails.ownershipType;
+      retailer.shopDetails.dateOfEstablishment = body.dateOfEstablishment || retailer.shopDetails.dateOfEstablishment;
+    }
+
+    /* -------------------------------
+       SHOP ADDRESS
+    ------------------------------- */
+    if (body.shopAddress || body.shopCity || body.shopState || body.shopLat || body.shopLng) {
+      retailer.shopDetails.shopAddress = {
+        address: body.shopAddress || retailer.shopDetails.shopAddress?.address,
+        city: body.shopCity || retailer.shopDetails.shopAddress?.city,
+        state: body.shopState || retailer.shopDetails.shopAddress?.state,
+        geoTags: {
+          lat: body.shopLat ? parseFloat(body.shopLat) : retailer.shopDetails.shopAddress?.geoTags?.lat,
+          lng: body.shopLng ? parseFloat(body.shopLng) : retailer.shopDetails.shopAddress?.geoTags?.lng
+        }
+      };
+    }
+
+    /* -------------------------------
+       BANK DETAILS
+    ------------------------------- */
+    if (body.bankName || body.accountNumber || body.IFSC || body.branchName) {
+      retailer.bankDetails = {
+        bankName: body.bankName || retailer.bankDetails?.bankName,
+        accountNumber: body.accountNumber || retailer.bankDetails?.accountNumber,
+        IFSC: body.IFSC || retailer.bankDetails?.IFSC,
+        branchName: body.branchName || retailer.bankDetails?.branchName
+      };
+    }
+
+    /* -------------------------------
+       FILE UPLOADS
+    ------------------------------- */
+    if (files.govtIdPhoto) {
+      retailer.govtIdPhoto = {
+        data: files.govtIdPhoto[0].buffer,
+        contentType: files.govtIdPhoto[0].mimetype
+      };
+    }
+
+    if (files.personPhoto) {
+      retailer.personPhoto = {
+        data: files.personPhoto[0].buffer,
+        contentType: files.personPhoto[0].mimetype
+      };
+    }
+
+    if (files.signature) {
+      retailer.signature = {
+        data: files.signature[0].buffer,
+        contentType: files.signature[0].mimetype
+      };
+    }
+
+    if (files.outletPhoto) {
+      retailer.shopDetails.outletPhoto = {
+        data: files.outletPhoto[0].buffer,
+        contentType: files.outletPhoto[0].mimetype
+      };
+    }
+
+    await retailer.save();
+
+    res.status(200).json({
+      message: "Retailer updated successfully",
+      retailer
+    });
+
+  } catch (error) {
+    console.error("Update retailer error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
 
 
 /* ===============================
@@ -235,13 +361,21 @@ export const loginRetailer = async (req, res) => {
 =============================== */
 export const getRetailerProfile = async (req, res) => {
   try {
-    const { id } = req.params;
-    const retailer = await Retailer.findById(id).select("-password");
+    // Extract JWT token
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) return res.status(401).json({ message: "Unauthorized: No token provided" });
+
+    // Decode the token to get retailer ID
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const retailerId = decoded.id;
+
+    const retailer = await Retailer.findById(retailerId).select("-password");
     if (!retailer) return res.status(404).json({ message: "Retailer not found" });
 
     res.status(200).json(retailer);
+
   } catch (error) {
-    console.error("Get retailer error:", error);
+    console.error("Get retailer profile error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
