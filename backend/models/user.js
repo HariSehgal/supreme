@@ -301,6 +301,54 @@ const employeeSchema = new Schema(
   },
   { timestamps: true }
 );
+const employeeReportSchema = new Schema(
+  {
+    employeeId: { type: Types.ObjectId, ref: "Employee", required: true },
+    campaignId: { type: Types.ObjectId, ref: "Campaign", required: true },
+    retailerId: { type: Types.ObjectId, ref: "Retailer", required: true },
+
+    visitType: String,
+    attended: String,
+    notVisitedReason: String,
+    otherReasonText: String,
+
+    reportType: String,
+    frequency: String,
+    fromDate: Date,
+    toDate: Date,
+    extraField: String,
+
+    stockType: String,
+    brand: String,
+    product: String,
+    sku: String,
+    productType: String,
+    quantity: Number,
+
+    // Geo Tag
+    location: {
+      latitude: Number,
+      longitude: Number,
+    },
+
+    images: [
+      {
+        data: Buffer,
+        contentType: String,
+        fileName: String,
+      },
+    ],
+
+    billCopy: {
+      data: Buffer,
+      contentType: String,
+      fileName: String,
+    },
+  },
+  { timestamps: true }
+);
+
+export const EmployeeReport = model("EmployeeReport", employeeReportSchema);
 
 /* ===========================
    PASSWORD HASH MIDDLEWARE
