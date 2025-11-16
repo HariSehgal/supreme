@@ -5,6 +5,7 @@ import {
   updateCampaignStatus,
   updateEmployeeProfile,
   clientSetPaymentPlan,
+   submitEmployeeReport
 } from "../controllers/employeeController.js";
 import { protect } from "../middleware/authMiddleware.js";
 import { upload } from "../middleware/upload.js"; // ✅ your existing upload.js
