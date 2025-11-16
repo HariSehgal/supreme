@@ -315,3 +315,96 @@ export const clientSetPaymentPlan = async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+export const submitEmployeeReport = async (req, res) => {
+  try {
+    const employeeId = req.user.id;
+
+    const {
+      campaignId,
+      retailerId,
+      visitType,
+      attended,
+      notVisitedReason,
+      otherReasonText,
+      reportType,
+      frequency,
+      fromDate,
+      toDate,
+      extraField,
+      stockType,
+      brand,
+      product,
+      sku,
+      productType,
+      quantity,
+      latitude,
+      longitude
+    } = req.body;
+
+    // Basic Validation
+    if (!campaignId || !retailerId) {
+      return res.status(400).json({ message: "campaignId and retailerId are required" });
+    }
+
+    // Create Report Document
+    const report = new EmployeeReport({
+      employeeId,
+      campaignId,
+      retailerId,
+      visitType,
+      attended,
+      notVisitedReason,
+      otherReasonText,
+      reportType,
+      frequency,
+      fromDate,
+      toDate,
+      extraField,
+      stockType,
+      brand,
+      product,
+      sku,
+      productType,
+      quantity,
+      location: {
+        latitude: Number(latitude) || null,
+        longitude: Number(longitude) || null,
+      },
+    });
+
+    /* ----------------------------
+       🔥 Handle Images Upload
+    ---------------------------- */
+    const files = req.files || {};
+
+    // Multiple images
+    if (files.images) {
+      report.images = files.images.map((file) => ({
+        data: file.buffer,
+        contentType: file.mimetype,
+        fileName: file.originalname,
+      }));
+    }
+
+    // Single bill copy
+    if (files.billCopy && files.billCopy[0]) {
+      const file = files.billCopy[0];
+      report.billCopy = {
+        data: file.buffer,
+        contentType: file.mimetype,
+        fileName: file.originalname,
+      };
+    }
+
+    await report.save();
+
+    res.status(201).json({
+      message: "Report submitted successfully",
+      report,
+    });
+
+  } catch (error) {
+    console.error("Submit report error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
