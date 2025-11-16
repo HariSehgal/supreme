@@ -1,5 +1,5 @@
 import jwt from "jsonwebtoken";
-import { Employee, Campaign,submitEmployeeReport } from "../models/user.js";
+import { Employee, Campaign,EmployeeReport } from "../models/user.js";
 
 import bcrypt  from "bcryptjs"; 
 
