@@ -5,11 +5,12 @@ import {
   updateCampaignStatus,
   updateEmployeeProfile,
   clientSetPaymentPlan,
-   submitEmployeeReport
+   submitEmployeeReport,
+   getEmployeeReports,
+     downloadEmployeeReport
 } from "../controllers/employeeController.js";
 import { protect } from "../middleware/authMiddleware.js";
-import { upload } from "../middleware/upload.js"; // ✅ your existing upload.js
-
+import { upload } from "../middleware/upload.js"; 
 const router = express.Router();
 
 /* ================================
@@ -54,6 +55,12 @@ router.post(
     { name: "billCopy", maxCount: 1 }
   ]),
   submitEmployeeReport
+);
+router.get("/reports", protect, getEmployeeReports);
+router.post(
+  "/report/download",
+  protect,
+  downloadEmployeeReport
 );
 
 export default router;
