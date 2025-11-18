@@ -1,7 +1,8 @@
 import jwt from "jsonwebtoken";
 import { Employee, Campaign,EmployeeReport } from "../models/user.js";
 import bcrypt from "bcryptjs";
-import PDFDocument from "pdfkit";
+import PDFKit from "pdfkit";
+const PDFDocument = PDFKit;
 /* ======================================================
    UPDATE EMPLOYEE PROFILE
 ====================================================== */
