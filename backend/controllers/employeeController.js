@@ -1,8 +1,7 @@
 import jwt from "jsonwebtoken";
 import { Employee, Campaign,EmployeeReport } from "../models/user.js";
 import bcrypt from "bcryptjs";
-import PDFKit from "pdfkit";
-const PDFDocument = PDFKit;
+import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 /* ======================================================
    UPDATE EMPLOYEE PROFILE
 ====================================================== */
@@ -484,7 +483,6 @@ export const downloadEmployeeReport = async (req, res) => {
       return res.status(400).json({ message: "reportId is required" });
     }
 
-    // Fetch EXACT report
     const report = await EmployeeReport.findOne({
       _id: reportId,
       employeeId
@@ -497,145 +495,179 @@ export const downloadEmployeeReport = async (req, res) => {
       return res.status(404).json({ message: "Report not found" });
     }
 
-    // Create PDF document
-    const doc = new PDFDocument({ margin: 40 });
+    // ---------------------------
+    // CREATE PDF DOCUMENT
+    // ---------------------------
+    const pdfDoc = await PDFDocument.create();
+    const page = pdfDoc.addPage();
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const { width, height } = page.getSize();
+    let y = height - 50;
 
-    // Set Response Headers before piping
+    const write = (text, size = 12) => {
+      if (y < 60) {
+        const newPage = pdfDoc.addPage();
+        y = newPage.getSize().height - 50;
+        newPage.drawText(text, { x: 40, y, size, font });
+        y -= size + 8;
+        return;
+      }
+
+      page.drawText(text, {
+        x: 40,
+        y,
+        size,
+        font
+      });
+      y -= size + 8;
+    };
+
+    // ---------------------------
+    // HEADER
+    // ---------------------------
+    write("Employee Visit Report", 22);
+    y -= 10;
+
+    // ---------------------------
+    // EMPLOYEE DETAILS
+    // ---------------------------
+    write("Employee Details", 16);
+    write(`Name: ${report.employeeId?.name || "N/A"}`);
+    write(`Email: ${report.employeeId?.email || "N/A"}`);
+    write(`Phone: ${report.employeeId?.phone || "N/A"}`);
+
+    y -= 10;
+
+    // ---------------------------
+    // CAMPAIGN DETAILS
+    // ---------------------------
+    write("Campaign Details", 16);
+    write(`Campaign: ${report.campaignId?.name || "N/A"}`);
+    write(`Type: ${report.campaignId?.type || "N/A"}`);
+
+    y -= 10;
+
+    // ---------------------------
+    // RETAILER DETAILS
+    // ---------------------------
+    write("Retailer Details", 16);
+    write(`Name: ${report.retailerId?.name || "N/A"}`);
+    write(`Contact: ${report.retailerId?.contactNo || "N/A"}`);
+
+    const addr = report.retailerId?.shopDetails?.shopAddress;
+    write(
+      `Address: ${
+        addr
+          ? `${addr.address || ""}, ${addr.city || ""}, ${addr.state || ""}, ${addr.pincode || ""}`
+          : "N/A"
+      }`
+    );
+
+    y -= 10;
+
+    // ---------------------------
+    // REPORT DETAILS
+    // ---------------------------
+    write("Report Details", 16);
+    write(`Visit Type: ${report.visitType || "N/A"}`);
+    write(`Attended: ${report.attended ? "Yes" : "No"}`);
+    write(`Reason: ${report.notVisitedReason || "N/A"}`);
+    write(`Report Type: ${report.reportType || "N/A"}`);
+    write(`Frequency: ${report.frequency || "N/A"}`);
+
+    write(
+      `Date Range: ${
+        report.fromDate ? new Date(report.fromDate).toLocaleDateString() : "N/A"
+      } to ${
+        report.toDate ? new Date(report.toDate).toLocaleDateString() : "N/A"
+      }`
+    ); // FIXED "→"
+
+    y -= 10;
+
+    // ---------------------------
+    // LOCATION
+    // ---------------------------
+    write("Location", 16);
+    write(`Latitude: ${report.location?.latitude || "N/A"}`);
+    write(`Longitude: ${report.location?.longitude || "N/A"}`);
+
+    // ---------------------------
+    // ATTACHED IMAGES
+    // ---------------------------
+    if (report.images?.length) {
+      for (let img of report.images) {
+        if (!img?.data) continue;
+
+        const imgPage = pdfDoc.addPage();
+
+        let embedded;
+        try {
+          if (img.contentType.includes("png")) {
+            embedded = await pdfDoc.embedPng(img.data);
+          } else {
+            embedded = await pdfDoc.embedJpg(img.data);
+          }
+        } catch (e) {
+          continue;
+        }
+
+        const dims = embedded.scale(0.4);
+
+        imgPage.drawImage(embedded, {
+          x: 50,
+          y: 150,
+          width: dims.width,
+          height: dims.height
+        });
+      }
+    }
+
+    // ---------------------------
+    // BILL COPY
+    // ---------------------------
+    if (report.billCopy?.data) {
+      const billPage = pdfDoc.addPage();
+
+      let embedded;
+      try {
+        if (report.billCopy.contentType.includes("png")) {
+          embedded = await pdfDoc.embedPng(report.billCopy.data);
+        } else {
+          embedded = await pdfDoc.embedJpg(report.billCopy.data);
+        }
+      } catch {}
+
+      if (embedded) {
+        const dims = embedded.scale(0.4);
+
+        billPage.drawImage(embedded, {
+          x: 50,
+          y: 150,
+          width: dims.width,
+          height: dims.height
+        });
+      }
+    }
+
+    // ---------------------------
+    // SEND PDF
+    // ---------------------------
+    const pdfBytes = await pdfDoc.save();
+
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename=report_${report._id}.pdf`
+      `attachment; filename=report_${reportId}.pdf`
     );
 
-    doc.pipe(res);
-
-    /* -------------------------
-       HEADER
-    --------------------------*/
-    doc.fontSize(20).text("Employee Visit Report", { align: "center" });
-    doc.moveDown();
-
-    /* -------------------------
-       EMPLOYEE INFO
-    --------------------------*/
-    doc.fontSize(14).text("Employee Details", { underline: true });
-    doc.fontSize(11);
-    doc.text(`Name: ${report.employeeId?.name || "N/A"}`);
-    doc.text(`Email: ${report.employeeId?.email || "N/A"}`);
-    doc.text(`Phone: ${report.employeeId?.phone || "N/A"}`);
-    doc.moveDown();
-
-    /* -------------------------
-       CAMPAIGN INFO
-    --------------------------*/
-    doc.fontSize(14).text("Campaign Details", { underline: true });
-    doc.fontSize(11);
-    doc.text(`Campaign: ${report.campaignId?.name || "N/A"}`);
-    doc.text(`Type: ${report.campaignId?.type || "N/A"}`);
-    doc.moveDown();
-
-    /* -------------------------
-       RETAILER INFO
-    --------------------------*/
-    doc.fontSize(14).text("Retailer Details", { underline: true });
-    doc.fontSize(11);
-    doc.text(`Name: ${report.retailerId?.name || "N/A"}`);
-    doc.text(`Contact: ${report.retailerId?.contactNo || "N/A"}`);
-
-    const addr = report.retailerId?.shopDetails?.shopAddress;
-    doc.text(
-      `Address: ${
-        addr
-          ? `${addr.address || ""}, ${addr.city || ""}, ${addr.state || ""}, ${
-              addr.pincode || ""
-            }`
-          : "N/A"
-      }`
-    );
-    doc.moveDown();
-
-    /* -------------------------
-       REPORT DETAILS
-    --------------------------*/
-    doc.fontSize(14).text("Report Details", { underline: true });
-    doc.fontSize(11);
-    doc.text(`Visit Type: ${report.visitType || "N/A"}`);
-    doc.text(`Attended: ${report.attended ? "Yes" : "No"}`);
-    doc.text(`Reason: ${report.notVisitedReason || "N/A"}`);
-    doc.text(`Report Type: ${report.reportType || "N/A"}`);
-    doc.text(`Frequency: ${report.frequency || "N/A"}`);
-    doc.text(
-      `Date Range: ${
-        report.fromDate
-          ? new Date(report.fromDate).toLocaleDateString()
-          : "N/A"
-      } → ${
-        report.toDate ? new Date(report.toDate).toLocaleDateString() : "N/A"
-      }`
-    );
-    doc.moveDown();
-
-    /* -------------------------
-       GEOLOCATION
-    --------------------------*/
-    doc.fontSize(14).text("Location", { underline: true });
-    doc.fontSize(11);
-    doc.text(`Latitude: ${report.location?.latitude || "N/A"}`);
-    doc.text(`Longitude: ${report.location?.longitude || "N/A"}`);
-    doc.moveDown();
-
-    /* -------------------------
-       IMAGES
-    --------------------------*/
-    if (report.images?.length) {
-      doc.addPage();
-      doc.fontSize(14).text("Attached Images", { underline: true });
-
-      for (let img of report.images) {
-        try {
-          if (img?.data) {
-            doc.addPage();
-            doc.image(img.data, {
-              fit: [500, 500],
-              align: "center",
-            });
-            doc.text(img.fileName || "Image", { align: "center" });
-          }
-        } catch (err) {
-          doc.text("[Failed to load image]");
-        }
-      }
-    }
-
-    /* -------------------------
-       BILL COPY
-    --------------------------*/
-    if (report.billCopy?.data) {
-      doc.addPage();
-      doc.fontSize(14).text("Bill Copy", { underline: true });
-
-      try {
-        doc.image(report.billCopy.data, {
-          fit: [500, 500],
-          align: "center",
-        });
-      } catch {
-        doc.text("[Failed to load bill copy]");
-      }
-    }
-
-    doc.end();
+    return res.end(Buffer.from(pdfBytes));
   } catch (error) {
     console.error("PDF Download Error:", error);
 
-    if (!res.headersSent) {
-      return res.status(500).json({
-        message: "Failed to generate report PDF",
-        error: error.message,
-      });
-    }
-    try {
-      res.end();
-    } catch {}
+    return res.status(500).json({
+      message: "Failed generating report PDF",
+      error: error.message
+    });
   }
 };
