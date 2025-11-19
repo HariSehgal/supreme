@@ -1,6 +1,5 @@
 import { CareerApplication, JobApplication, Job } from "../models/user.js";
 import nodemailer from "nodemailer";
-import fetch from "node-fetch";
 
 /* ============================================================
    APPLY TO A JOB (Candidate)
@@ -13,7 +12,7 @@ export const applyToJob = async (req, res) => {
     const { fullName, email, phone, city, coverLetter, jobId } = req.body;
     const resumeFile = req.file;
 
-    // 1️⃣ Validate inputs
+    // Validate
     if (!fullName || !email || !jobId)
       return res.status(400).json({
         message: "Full name, email, and job ID are required",
@@ -22,12 +21,14 @@ export const applyToJob = async (req, res) => {
     if (!resumeFile)
       return res.status(400).json({ message: "Resume file is required" });
 
-    // 2️⃣ Check job existence
+    // Check job exists
     const job = await Job.findById(jobId);
     if (!job || !job.isActive)
-      return res.status(404).json({ message: "Job not found or inactive" });
+      return res
+        .status(404)
+        .json({ message: "Job not found or inactive" });
 
-    // 3️⃣ Create or update candidate record
+    // Create or update candidate
     let candidate = await CareerApplication.findOne({ email });
 
     if (!candidate) {
@@ -56,7 +57,7 @@ export const applyToJob = async (req, res) => {
       await candidate.save();
     }
 
-    // 4️⃣ Prevent duplicate job applications
+    // Prevent duplicate job applications
     const existingApp = await JobApplication.findOne({
       candidate: candidate._id,
       job: job._id,
@@ -67,7 +68,7 @@ export const applyToJob = async (req, res) => {
         .status(400)
         .json({ message: "You have already applied for this job." });
 
-    // 5️⃣ Create a new job application record
+    // Create new record
     const newApplication = await JobApplication.create({
       candidate: candidate._id,
       job: job._id,
@@ -76,7 +77,9 @@ export const applyToJob = async (req, res) => {
       currentRound: 0,
     });
 
-    // 6️⃣ Send confirmation email
+    /* ==========================
+       SEND EMAIL USING NODEMAILER
+    ========================== */
     const htmlContent = `
       <h2>Application Submitted Successfully</h2>
       <p>Dear ${fullName},</p>
@@ -88,64 +91,34 @@ export const applyToJob = async (req, res) => {
       <p>Best regards,<br/>HR Team</p>
     `;
 
-    // ✅ Use Resend in production (Render)
-    if (process.env.NODE_ENV === "production") {
-      try {
-        const response = await fetch("https://api.resend.com/emails", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            from: "Career Portal <onboarding@resend.dev>",
-            to: [email],
-            subject: `Application Received for ${job.title}`,
-            html: htmlContent,
-          }),
-        });
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error("Resend email failed:", errorText);
-        } else {
-          console.log(`✅ Resend email sent successfully to ${email}`);
-        }
-      } catch (emailErr) {
-        console.error("Resend error:", emailErr.message);
-      }
-    } else {
-      // ✅ Use Gmail locally
-      try {
-        const transporter = nodemailer.createTransport({
-          service: "gmail",
-          auth: {
-            user: process.env.EMAIL_USER,
-            pass: process.env.EMAIL_PASS,
-          },
-        });
+    await transporter.sendMail({
+      from: `"Career Portal" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: `Application Received for ${job.title}`,
+      html: htmlContent,
+    });
 
-        await transporter.sendMail({
-          from: `"Career Portal" <${process.env.EMAIL_USER}>`,
-          to: email,
-          subject: `Application Received for ${job.title}`,
-          html: htmlContent,
-        });
+    console.log(`📧 Email sent to ${email}`);
 
-        console.log(`✅ Local email sent to ${email}`);
-      } catch (emailErr) {
-        console.error("Local email error:", emailErr.message);
-      }
-    }
-
-    // 7️⃣ Respond success
+    // Success response
     res.status(201).json({
       message: "Application submitted successfully.",
       applicationId: newApplication._id,
     });
   } catch (err) {
     console.error("❌ Error in applyToJob:", err);
-    res.status(500).json({ message: "Internal server error", error: err.message });
+    res.status(500).json({
+      message: "Internal server error",
+      error: err.message,
+    });
   }
 };
 
@@ -156,7 +129,6 @@ export const getAllJobs = async (req, res) => {
   try {
     const { location, department, employmentType, search } = req.query;
 
-    // Base filter: only active jobs
     const filters = { isActive: true };
 
     if (location) filters.location = { $regex: location, $options: "i" };
@@ -164,16 +136,14 @@ export const getAllJobs = async (req, res) => {
     if (employmentType) filters.employmentType = { $regex: employmentType, $options: "i" };
     if (search) filters.title = { $regex: search, $options: "i" };
 
-    // Include all necessary fields in selection
     const jobs = await Job.find(filters)
       .sort({ createdAt: -1 })
       .select(
         "title description location department employmentType salaryRange experienceRequired createdAt"
       );
 
-    if (!jobs.length) {
+    if (!jobs.length)
       return res.status(404).json({ message: "No job postings available" });
-    }
 
     res.status(200).json({
       message: "Job postings retrieved successfully",
@@ -195,21 +165,22 @@ export const getCandidateApplications = async (req, res) => {
     if (!email)
       return res.status(400).json({ message: "Email parameter required." });
 
-    // ✅ Corrected field lookup (linked via CareerApplication)
     const candidate = await CareerApplication.findOne({ email });
     if (!candidate)
-      return res
-        .status(404)
-        .json({ message: "Candidate not found for provided email." });
+      return res.status(404).json({
+        message: "Candidate not found for provided email.",
+      });
 
-    const applications = await JobApplication.find({ candidate: candidate._id })
+    const applications = await JobApplication.find({
+      candidate: candidate._id,
+    })
       .populate("job", "title location department employmentType")
       .select("status createdAt");
 
     if (!applications.length)
-      return res
-        .status(404)
-        .json({ message: "No job applications found for this candidate." });
+      return res.status(404).json({
+        message: "No job applications found for this candidate.",
+      });
 
     res.status(200).json({
       message: "Applications retrieved successfully.",
