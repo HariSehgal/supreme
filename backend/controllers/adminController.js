@@ -332,7 +332,7 @@ export const addCampaign = async (req, res) => {
   try {
     const {
       name,
-      client,
+      client,              // This is organizationName
       type,
       region,
       state,
@@ -348,6 +348,15 @@ export const addCampaign = async (req, res) => {
     if (!name || !client || !type || !region || !state)
       return res.status(400).json({ message: "All fields are required" });
 
+    // Validate organization exists (ONLY VALIDATION)
+    const clientOrg = await ClientAdmin.findOne({ organizationName: client });
+
+    if (!clientOrg) {
+      return res.status(404).json({
+        message: `Client organization '${client}' does not exist.`
+      });
+    }
+
     // Date validation
     if (!campaignStartDate || !campaignEndDate)
       return res.status(400).json({ message: "Campaign start and end date are required" });
@@ -358,19 +367,22 @@ export const addCampaign = async (req, res) => {
     if (isNaN(start) || isNaN(end))
       return res.status(400).json({ message: "Invalid date format" });
 
+
     if (start > end)
       return res.status(400).json({ message: "Start date cannot be after end date" });
 
-    // Create campaign
+    // Create campaign (ONLY store organization name)
     const campaign = new Campaign({
       name,
-      client,
+      client, // Store ONLY the organizationName string
       type,
       region,
       state,
       createdBy: req.user.id,
       campaignStartDate: start,
       campaignEndDate: end,
+      // DO NOT LINK CLIENT ADMIN ID
+      // ONLY STORE ORGANIZATION NAME
     });
 
     await campaign.save();
@@ -382,9 +394,10 @@ export const addCampaign = async (req, res) => {
 
   } catch (error) {
     console.error("Add campaign error:", error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+
 
 /* ======================================================
    UPDATE CAMPAIGN STATUS (Activate / Deactivate)
@@ -485,41 +498,50 @@ export const deleteCampaign = async (req, res) => {
 ====================================================== */
 export const addEmployee = async (req, res) => {
   try {
-    const { name, email, contactNo, gender, address, dob, employeeType } = req.body;
+    const { 
+      name, 
+      email, 
+      contactNo, 
+      employeeType, 
+      position 
+    } = req.body;
 
-    // Check if the user is admin
+    // Check if user is admin
     if (!req.user || req.user.role !== "admin") {
       return res.status(403).json({ message: "Only admins can add employees" });
     }
 
-    //  Required field validation
-    if (!name || !email || !contactNo) {
-      return res.status(400).json({ message: "All fields are required" });
+    // Required fields
+    if (!name || !email || !contactNo || !employeeType) {
+      return res.status(400).json({
+        message: "Name, email, phone & employee type are required",
+      });
+    }
+
+    // Validate employee type
+    if (!["Permanent", "Contractual"].includes(employeeType)) {
+      return res.status(400).json({ message: "Invalid employee type" });
     }
 
     // Check existing employee
-    const existing = await Employee.findOne({ email });
+    const existing = await Employee.findOne({
+      $or: [{ email }, { phone: contactNo }],
+    });
+
     if (existing) {
       return res.status(409).json({ message: "Employee already exists" });
     }
 
-    //  Only admin can assign employeeType
-    let validEmployeeType = null;
-    if (employeeType && ["Permanent", "Contractual"].includes(employeeType)) {
-      validEmployeeType = employeeType;
-    }
-
-    //  Create employee (password = phone)
+    // Create employee
     const newEmployee = new Employee({
       name,
       email,
       phone: contactNo,
-      gender,
-      address,
-      dob,
-      password: contactNo, // auto-hashed in pre-save hook
+      password: contactNo,     // default password
+      employeeType,
+      position,
       createdByAdmin: req.user.id,
-      employeeType: validEmployeeType,
+      isActive: true           // <-- automatically active
     });
 
     await newEmployee.save();
@@ -532,10 +554,55 @@ export const addEmployee = async (req, res) => {
         email: newEmployee.email,
         phone: newEmployee.phone,
         employeeType: newEmployee.employeeType,
+        position: newEmployee.position,
+        isActive: newEmployee.isActive,
       },
     });
+
   } catch (error) {
     console.error("Add employee error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+export const changeEmployeeStatus = async (req, res) => {
+  try {
+    const { employeeId, isActive } = req.body;
+
+    // Validate admin
+    if (!req.user || req.user.role !== "admin") {
+      return res.status(403).json({ message: "Only admins can update employee status" });
+    }
+
+    // Validate input
+    if (!employeeId || typeof isActive !== "boolean") {
+      return res.status(400).json({
+        message: "employeeId and isActive (true/false) are required",
+      });
+    }
+
+    // Find employee by custom employeeId
+    const employee = await Employee.findOne({ employeeId });
+
+    if (!employee) {
+      return res.status(404).json({ message: "Employee not found" });
+    }
+
+    // Update the status
+    employee.isActive = isActive;
+    await employee.save();
+
+    res.status(200).json({
+      message: `Employee has been ${isActive ? "activated" : "deactivated"} successfully`,
+      employee: {
+        id: employee._id,
+        employeeId: employee.employeeId,
+        name: employee.name,
+        isActive: employee.isActive,
+      },
+    });
+
+  } catch (error) {
+    console.error("Employee status update error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
@@ -545,11 +612,15 @@ export const addEmployee = async (req, res) => {
 ====================================================== */
 export const bulkAddEmployees = async (req, res) => {
   try {
-    if (!req.user || req.user.role !== "admin")
+    // Only admin can bulk add
+    if (!req.user || req.user.role !== "admin") {
       return res.status(403).json({ message: "Only admins can add employees" });
+    }
 
-    if (!req.file)
+    // File check
+    if (!req.file) {
       return res.status(400).json({ message: "Excel/CSV file is required" });
+    }
 
     const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
@@ -558,39 +629,67 @@ export const bulkAddEmployees = async (req, res) => {
     const employeesToInsert = [];
 
     for (let row of data) {
-      const { name, email, contactNo, gender, address } = row;
-      if (!name || !email || !contactNo) continue;
+      const { 
+        name, 
+        email, 
+        contactNo, 
+        employeeType, 
+        position,
+        gender 
+      } = row;
 
-      const exists = await Employee.findOne({ email });
+      // Required fields
+      if (!name || !email || !contactNo || !employeeType) continue;
+
+      // Validate employee type
+      if (!["Permanent", "Contractual"].includes(employeeType)) continue;
+
+      // Check duplicates
+      const exists = await Employee.findOne({
+        $or: [{ email }, { phone: contactNo }]
+      });
       if (exists) continue;
 
-      const hashedPassword = await bcrypt.hash(contactNo.toString(), 10);
-
+      // Create employee object (employeeId auto-created by schema)
       employeesToInsert.push({
         name,
         email,
         phone: contactNo,
+        password: contactNo,           // Default password
+        employeeType,
+        position,
         gender,
-        address,
-        password: hashedPassword,
-        organization: req.user.id,
+        isActive: true,
+        createdByAdmin: req.user.id
       });
     }
 
-    if (employeesToInsert.length === 0)
+    if (employeesToInsert.length === 0) {
       return res.status(400).json({ message: "No valid employees to add" });
+    }
 
+    // Insert many
     const insertedEmployees = await Employee.insertMany(employeesToInsert);
 
     res.status(201).json({
       message: `${insertedEmployees.length} employees added successfully`,
-      employees: insertedEmployees,
+      employees: insertedEmployees.map(emp => ({
+        name: emp.name,
+        email: emp.email,
+        phone: emp.phone,
+        employeeId: emp.employeeId,
+        employeeType: emp.employeeType,
+        position: emp.position,
+        isActive: emp.isActive
+      }))
     });
+
   } catch (error) {
     console.error("Bulk add employees error:", error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+
 
 /* ======================================================
    ASSIGN CAMPAIGN TO EMPLOYEES & RETAILERS
@@ -599,37 +698,63 @@ export const assignCampaign = async (req, res) => {
   try {
     const { campaignId, employeeIds = [], retailerIds = [] } = req.body;
 
+    // -------------------------------
     // Admin check
-    if (!req.user || req.user.role !== "admin")
+    // -------------------------------
+    if (!req.user || req.user.role !== "admin") {
       return res.status(403).json({ message: "Only admins can assign campaigns" });
+    }
 
-    if (!campaignId)
+    if (!campaignId) {
       return res.status(400).json({ message: "Campaign ID is required" });
+    }
 
     const campaign = await Campaign.findById(campaignId);
-    if (!campaign)
-      return res.status(404).json({ message: "Campaign not found" });
 
-    // Default inherited dates
+    if (!campaign) {
+      return res.status(404).json({ message: "Campaign not found" });
+    }
+
+    // Campaign allowed states (array)
+    const allowedStates = Array.isArray(campaign.state)
+      ? campaign.state
+      : [campaign.state];
+
     const startDate = campaign.campaignStartDate;
     const endDate = campaign.campaignEndDate;
 
-    // Ensure arrays
+    // Ensure arrays exist
     campaign.assignedEmployees ||= [];
     campaign.assignedRetailers ||= [];
 
-    // ==========================
-    // ASSIGN EMPLOYEES
-    // ==========================
+    /* =========================================================================
+       ASSIGN EMPLOYEES — Validate state before assigning
+    ========================================================================= */
     for (const empId of employeeIds) {
       if (!empId) continue;
 
-      const existingIndex = campaign.assignedEmployees.findIndex(e =>
-        (e.employeeId || e).toString() === empId.toString()
+      const employee = await Employee.findById(empId);
+      if (!employee) continue;
+
+      const employeeState = employee?.correspondenceAddress?.state;
+
+      // Validate state match
+      const isAllowed =
+        allowedStates.includes("All") ||
+        (employeeState && allowedStates.includes(employeeState));
+
+      if (!isAllowed) {
+        return res.status(400).json({
+          message: `❌ Employee '${employee.name}' cannot be assigned because their state '${employeeState}' is not allowed in this campaign.`,
+        });
+      }
+
+      // Check duplication
+      const exists = campaign.assignedEmployees.some(
+        (e) => e.employeeId.toString() === empId.toString()
       );
 
-      if (existingIndex === -1) {
-        // New Assignment
+      if (!exists) {
         campaign.assignedEmployees.push({
           employeeId: empId,
           status: "pending",
@@ -638,39 +763,40 @@ export const assignCampaign = async (req, res) => {
           startDate,
           endDate,
         });
-      } else {
-        // Normalize legacy entry
-        const entry = campaign.assignedEmployees[existingIndex];
-        if (!entry.employeeId) {
-          campaign.assignedEmployees[existingIndex] = {
-            employeeId: entry,
-            status: "pending",
-            assignedAt: new Date(),
-            updatedAt: new Date(),
-            startDate,
-            endDate,
-          };
-        }
       }
 
-      // Add in Employee model
+      // Update Employee model
       await Employee.findByIdAndUpdate(empId, {
         $addToSet: { assignedCampaigns: campaign._id },
       });
     }
 
-    // ==========================
-    // ASSIGN RETAILERS
-    // ==========================
+    /* =========================================================================
+       ASSIGN RETAILERS — Validate retailer's single shop state
+    ========================================================================= */
     for (const retId of retailerIds) {
       if (!retId) continue;
 
-      const existingIndex = campaign.assignedRetailers.findIndex(r =>
-        (r.retailerId || r).toString() === retId.toString()
+      const retailer = await Retailer.findById(retId);
+      if (!retailer) continue;
+
+      const retailerState = retailer?.shopDetails?.shopAddress?.state;
+
+      const isAllowed =
+        allowedStates.includes("All") ||
+        (retailerState && allowedStates.includes(retailerState));
+
+      if (!isAllowed) {
+        return res.status(400).json({
+          message: `❌ Retailer '${retailer.name}' cannot be assigned because their state '${retailerState}' is not allowed in this campaign.`,
+        });
+      }
+
+      const exists = campaign.assignedRetailers.some(
+        (r) => r.retailerId.toString() === retId.toString()
       );
 
-      if (existingIndex === -1) {
-        // New Assignment
+      if (!exists) {
         campaign.assignedRetailers.push({
           retailerId: retId,
           status: "pending",
@@ -679,27 +805,13 @@ export const assignCampaign = async (req, res) => {
           startDate,
           endDate,
         });
-      } else {
-        // Normalize legacy entry
-        const entry = campaign.assignedRetailers[existingIndex];
-        if (!entry.retailerId) {
-          campaign.assignedRetailers[existingIndex] = {
-            retailerId: entry,
-            status: "pending",
-            assignedAt: new Date(),
-            updatedAt: new Date(),
-            startDate,
-            endDate,
-          };
-        }
       }
 
-      // Add in Retailer model
       await Retailer.findByIdAndUpdate(retId, {
         $addToSet: { assignedCampaigns: campaign._id },
       });
 
-      // Create Payment Record If Needed
+      // Create default payment record only once
       const existingPayment = await Payment.findOne({
         campaign: campaign._id,
         retailer: retId,
@@ -727,6 +839,7 @@ export const assignCampaign = async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+
 export const updateRetailerDates = async (req, res) => {
   try {
     const { campaignId, retailerId } = req.params;
