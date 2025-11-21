@@ -173,6 +173,18 @@ const employeeSchema = new Schema(
     password: { type: String },
     isFirstLogin: { type: Boolean, default: true },
 
+    position: { type: String, required: false },
+
+    isActive: {
+      type: Boolean,
+      default: true, // every new employee is active
+    },
+
+    employeeId: {
+      type: String,
+      unique: true,
+    },
+
     // Linked organization/admin
     organization: { type: Schema.Types.ObjectId, ref: "ClientAdmin" },
     createdByAdmin: { type: Schema.Types.ObjectId, ref: "Admin" },
@@ -234,7 +246,7 @@ const employeeSchema = new Schema(
     },
 
     // -------- Contractual Specific --------
-    contractLength: String, // e.g., "6 months" or "1 year"
+    contractLength: String,
 
     // -------- Work Experience --------
     experiences: [
@@ -247,48 +259,18 @@ const employeeSchema = new Schema(
       },
     ],
 
-    // -------- Uploaded Files (updated structure) --------
+    // -------- Uploaded Files --------
     files: {
-      aadhaarFront: {
-        data: Buffer,
-        contentType: String,
-      },
-      aadhaarBack: {
-        data: Buffer,
-        contentType: String,
-      },
-      panCard: {
-        data: Buffer,
-        contentType: String,
-      },
-      personPhoto: {
-        data: Buffer,
-        contentType: String,
-      },
-      familyPhoto: {
-        data: Buffer,
-        contentType: String,
-      },
-      bankProof: {
-        data: Buffer,
-        contentType: String,
-      },
-      esiForm: {
-        data: Buffer,
-        contentType: String,
-      },
-      pfForm: {
-        data: Buffer,
-        contentType: String,
-      },
-      employmentForm: {
-        data: Buffer,
-        contentType: String,
-      },
-      cv: {
-        data: Buffer,
-        contentType: String,
-      },
+      aadhaarFront: { data: Buffer, contentType: String },
+      aadhaarBack: { data: Buffer, contentType: String },
+      panCard: { data: Buffer, contentType: String },
+      personPhoto: { data: Buffer, contentType: String },
+      familyPhoto: { data: Buffer, contentType: String },
+      bankProof: { data: Buffer, contentType: String },
+      esiForm: { data: Buffer, contentType: String },
+      pfForm: { data: Buffer, contentType: String },
+      employmentForm: { data: Buffer, contentType: String },
+      cv: { data: Buffer, contentType: String },
     },
 
     // -------- Campaign Assignment --------
@@ -301,6 +283,7 @@ const employeeSchema = new Schema(
   },
   { timestamps: true }
 );
+
 const employeeReportSchema = new Schema(
   {
     employeeId: { type: Types.ObjectId, ref: "Employee", required: true },
