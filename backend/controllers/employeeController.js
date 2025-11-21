@@ -19,7 +19,6 @@ export const updateEmployeeProfile = async (req, res) => {
     const isContractual = employee.employeeType === "Contractual";
 
     if (isContractual) {
-      // ❌ Remove permanent-only fields
       const blocked = [
         "highestQualification",
         "maritalStatus",
@@ -41,7 +40,6 @@ export const updateEmployeeProfile = async (req, res) => {
       ];
       blocked.forEach((f) => delete req.body[f]);
 
-      // ❌ Remove permanent-only files
       const blockedFiles = [
         "familyPhoto",
         "esiForm",
@@ -53,7 +51,7 @@ export const updateEmployeeProfile = async (req, res) => {
     }
 
     /* --------------------------------------------------
-       🔥 Step 2: Destructure incoming simple fields
+       🔥 Step 2: Simple fields
     -------------------------------------------------- */
     const {
       gender,
@@ -107,8 +105,7 @@ export const updateEmployeeProfile = async (req, res) => {
     });
 
     /* --------------------------------------------------
-       🔥 Step 2.1: Handle nested dot-notation fields
-       Example: correspondenceAddress.city = "Pune"
+       🔥 Step 2.1: Handle dot-notation nested fields
     -------------------------------------------------- */
     const nestedFields = Object.keys(req.body).filter(key => key.includes("."));
     nestedFields.forEach(key => {
@@ -118,8 +115,7 @@ export const updateEmployeeProfile = async (req, res) => {
     });
 
     /* --------------------------------------------------
-       🔥 Step 3: Parse Nested JSON Fields (if provided)
-       Example: correspondenceAddress = "{...}"
+       🔥 Step 3: Parse nested JSON
     -------------------------------------------------- */
     if (req.body.correspondenceAddress && typeof req.body.correspondenceAddress === "string") {
       employee.correspondenceAddress = JSON.parse(req.body.correspondenceAddress);
@@ -138,22 +134,31 @@ export const updateEmployeeProfile = async (req, res) => {
     }
 
     /* --------------------------------------------------
-       🔥 Step 4: Handle file uploads
+       🔥 Step 4: Handle File Uploads (UPDATED)
     -------------------------------------------------- */
     const files = req.files || {};
+
+    // 🟡 Person Photo (stored OUTSIDE `files`)
+    if (files["personPhoto"]) {
+      employee.personPhoto = {
+        data: files["personPhoto"][0].buffer,
+        contentType: files["personPhoto"][0].mimetype
+      };
+    }
+
+    // 🟡 All OTHER uploaded files inside employee.files
     if (!employee.files) employee.files = {};
 
     const fileFields = [
       "aadhaarFront",
       "aadhaarBack",
       "panCard",
-      "personPhoto",
       "familyPhoto",
       "bankProof",
       "esiForm",
       "pfForm",
       "employmentForm",
-      "cv",
+      "cv"
     ];
 
     fileFields.forEach((field) => {
@@ -166,13 +171,12 @@ export const updateEmployeeProfile = async (req, res) => {
     });
 
     /* --------------------------------------------------
-       🔥 Step 5: Password change (optional)
+       🔥 Step 5: Handle Password Change
     -------------------------------------------------- */
     if (newPassword && newPassword.trim().length >= 6) {
       employee.password = await bcrypt.hash(newPassword, 10);
     }
 
-    // Mark first login as completed
     employee.isFirstLogin = false;
 
     /* --------------------------------------------------
