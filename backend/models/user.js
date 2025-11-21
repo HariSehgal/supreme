@@ -174,7 +174,7 @@ const employeeSchema = new Schema(
     isFirstLogin: { type: Boolean, default: true },
 
     position: { type: String, required: false },
-
+    personPhoto: { data: Buffer, contentType: String },
     isActive: {
       type: Boolean,
       default: true, // every new employee is active
@@ -284,6 +284,30 @@ const employeeSchema = new Schema(
   { timestamps: true }
 );
 
+// ------------------------------------------------------
+// 🔥 Auto-generate employeeId (4 letters + 5 digits)
+// ------------------------------------------------------
+employeeSchema.pre("save", function (next) {
+  if (!this.employeeId) {
+    // Generate 4 random uppercase alphabets
+    const letters = Array.from({ length: 4 }, () =>
+      String.fromCharCode(65 + Math.floor(Math.random() * 26))
+    ).join("");
+
+    // Generate 5 random numbers
+    const numbers = Math.floor(10000 + Math.random() * 90000);
+
+    // Final employee ID
+    this.employeeId = `${letters}${numbers}`;
+  }
+
+  next();
+});
+
+const reportFileSchema = new mongoose.Schema({
+  data: Buffer,
+  contentType: String,
+});
 const employeeReportSchema = new Schema(
   {
     employeeId: { type: Types.ObjectId, ref: "Employee", required: true },
