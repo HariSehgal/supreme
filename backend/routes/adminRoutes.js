@@ -28,7 +28,7 @@ import {
   updateApplicationStatus,
   getCandidateResume,
 
-
+changeEmployeeStatus,
   updateRetailerDates,
   updateEmployeeDates
 } from "../controllers/adminController.js";
@@ -46,7 +46,13 @@ router.post("/forgot-password", forgotPassword);
 router.post("/reset-password", resetPassword);
 
 router.post("/employees", protect, addEmployee);
-router.post("/employees/bulk", protect, upload.single("file"), bulkAddEmployees);
+router.post(
+  "/employees/bulk",
+  protect,
+  upload.single("file"),   // file key MUST be "file"
+  bulkAddEmployees
+);
+
 router.get("/employees", protect, getAllEmployees);
 
 router.get("/retailers", protect, getAllRetailers);
@@ -61,6 +67,7 @@ router.post(
   ]),
   registerRetailer
 );
+router.put("/employee/status", protect, changeEmployeeStatus);
 
 router.post("/campaigns", protect, addCampaign);
 router.get("/campaigns", protect, getAllCampaigns);
