@@ -7,7 +7,8 @@ import {
   clientSetPaymentPlan,
    submitEmployeeReport,
    getEmployeeReports,
-     downloadEmployeeReport
+     downloadEmployeeReport,
+     downloadEmployeeReportsExcel
 } from "../controllers/employeeController.js";
 import { protect } from "../middleware/authMiddleware.js";
 import { upload } from "../middleware/upload.js"; 
@@ -62,5 +63,6 @@ router.post(
   protect,
   downloadEmployeeReport
 );
+router.get("/reports/download/excel", protect, downloadEmployeeReportsExcel);
 
 export default router;
