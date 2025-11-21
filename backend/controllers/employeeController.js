@@ -1,6 +1,8 @@
 import jwt from "jsonwebtoken";
 import { Employee, Campaign,EmployeeReport } from "../models/user.js";
 import bcrypt from "bcryptjs";
+import { Retailer } from "../models/user.js";
+import XLSX from "xlsx";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 /* ======================================================
    UPDATE EMPLOYEE PROFILE
@@ -37,10 +39,9 @@ export const updateEmployeeProfile = async (req, res) => {
         "esiDispensary",
         "experiences",
       ];
-
       blocked.forEach((f) => delete req.body[f]);
 
-      
+      // ❌ Remove permanent-only files
       const blockedFiles = [
         "familyPhoto",
         "esiForm",
@@ -52,7 +53,7 @@ export const updateEmployeeProfile = async (req, res) => {
     }
 
     /* --------------------------------------------------
-       🔥 Step 2: Destructure Incoming Fields
+       🔥 Step 2: Destructure incoming simple fields
     -------------------------------------------------- */
     const {
       gender,
@@ -77,7 +78,7 @@ export const updateEmployeeProfile = async (req, res) => {
       pfNumber,
       esiDispensary,
       contractLength,
-      newPassword,
+      newPassword
     } = req.body;
 
     Object.assign(employee, {
@@ -102,27 +103,42 @@ export const updateEmployeeProfile = async (req, res) => {
       esiNumber,
       pfNumber,
       esiDispensary,
-      contractLength,
+      contractLength
     });
 
     /* --------------------------------------------------
-       🔥 Step 3: Parse Nested JSON Fields
+       🔥 Step 2.1: Handle nested dot-notation fields
+       Example: correspondenceAddress.city = "Pune"
     -------------------------------------------------- */
-    if (req.body.correspondenceAddress) {
+    const nestedFields = Object.keys(req.body).filter(key => key.includes("."));
+    nestedFields.forEach(key => {
+      const [parent, child] = key.split(".");
+      if (!employee[parent]) employee[parent] = {};
+      employee[parent][child] = req.body[key];
+    });
+
+    /* --------------------------------------------------
+       🔥 Step 3: Parse Nested JSON Fields (if provided)
+       Example: correspondenceAddress = "{...}"
+    -------------------------------------------------- */
+    if (req.body.correspondenceAddress && typeof req.body.correspondenceAddress === "string") {
       employee.correspondenceAddress = JSON.parse(req.body.correspondenceAddress);
     }
-    if (req.body.permanentAddress) {
+
+    if (req.body.permanentAddress && typeof req.body.permanentAddress === "string") {
       employee.permanentAddress = JSON.parse(req.body.permanentAddress);
     }
-    if (req.body.bankDetails) {
+
+    if (req.body.bankDetails && typeof req.body.bankDetails === "string") {
       employee.bankDetails = JSON.parse(req.body.bankDetails);
     }
+
     if (req.body.experiences && !isContractual) {
       employee.experiences = JSON.parse(req.body.experiences);
     }
 
     /* --------------------------------------------------
-       🔥 Step 4: Handle Files Uploading
+       🔥 Step 4: Handle file uploads
     -------------------------------------------------- */
     const files = req.files || {};
     if (!employee.files) employee.files = {};
@@ -150,7 +166,7 @@ export const updateEmployeeProfile = async (req, res) => {
     });
 
     /* --------------------------------------------------
-       🔥 Step 5: Password Change (Optional)
+       🔥 Step 5: Password change (optional)
     -------------------------------------------------- */
     if (newPassword && newPassword.trim().length >= 6) {
       employee.password = await bcrypt.hash(newPassword, 10);
@@ -159,6 +175,9 @@ export const updateEmployeeProfile = async (req, res) => {
     // Mark first login as completed
     employee.isFirstLogin = false;
 
+    /* --------------------------------------------------
+       🔥 Step 6: Save
+    -------------------------------------------------- */
     await employee.save();
 
     res.status(200).json({
@@ -171,12 +190,15 @@ export const updateEmployeeProfile = async (req, res) => {
         isFirstLogin: employee.isFirstLogin,
       },
     });
+
   } catch (error) {
     console.error("❌ Error updating employee profile:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
+    res.status(500).json({
+      message: "Server error",
+      error: error.message,
+    });
   }
 };
-
 /* ======================================================
    LOGIN EMPLOYEE
 ====================================================== */
@@ -474,6 +496,7 @@ export const getEmployeeReports = async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+
 export const downloadEmployeeReport = async (req, res) => {
   try {
     const employeeId = req.user.id;
@@ -483,6 +506,7 @@ export const downloadEmployeeReport = async (req, res) => {
       return res.status(400).json({ message: "reportId is required" });
     }
 
+    // Fetch EXACT report of logged-in employee
     const report = await EmployeeReport.findOne({
       _id: reportId,
       employeeId
@@ -499,27 +523,25 @@ export const downloadEmployeeReport = async (req, res) => {
     // CREATE PDF DOCUMENT
     // ---------------------------
     const pdfDoc = await PDFDocument.create();
-    const page = pdfDoc.addPage();
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+
+    let page = pdfDoc.addPage();
     const { width, height } = page.getSize();
-    let y = height - 50;
+    let y = height - 40;
 
     const write = (text, size = 12) => {
       if (y < 60) {
-        const newPage = pdfDoc.addPage();
-        y = newPage.getSize().height - 50;
-        newPage.drawText(text, { x: 40, y, size, font });
-        y -= size + 8;
-        return;
+        page = pdfDoc.addPage();
+        y = page.getSize().height - 40;
       }
-
-      page.drawText(text, {
+      page.drawText(String(text), {
         x: 40,
         y,
         size,
-        font
+        font,
+        color: rgb(0, 0, 0),
       });
-      y -= size + 8;
+      y -= size + 6;
     };
 
     // ---------------------------
@@ -535,34 +557,30 @@ export const downloadEmployeeReport = async (req, res) => {
     write(`Name: ${report.employeeId?.name || "N/A"}`);
     write(`Email: ${report.employeeId?.email || "N/A"}`);
     write(`Phone: ${report.employeeId?.phone || "N/A"}`);
-
     y -= 10;
 
     // ---------------------------
     // CAMPAIGN DETAILS
     // ---------------------------
     write("Campaign Details", 16);
-    write(`Campaign: ${report.campaignId?.name || "N/A"}`);
-    write(`Type: ${report.campaignId?.type || "N/A"}`);
-
+    write(`Campaign Name: ${report.campaignId?.name || "N/A"}`);
+    write(`Campaign Type: ${report.campaignId?.type || "N/A"}`);
     y -= 10;
 
     // ---------------------------
     // RETAILER DETAILS
     // ---------------------------
     write("Retailer Details", 16);
-    write(`Name: ${report.retailerId?.name || "N/A"}`);
+    write(`Retailer Name: ${report.retailerId?.name || "N/A"}`);
     write(`Contact: ${report.retailerId?.contactNo || "N/A"}`);
 
     const addr = report.retailerId?.shopDetails?.shopAddress;
-    write(
-      `Address: ${
-        addr
-          ? `${addr.address || ""}, ${addr.city || ""}, ${addr.state || ""}, ${addr.pincode || ""}`
-          : "N/A"
-      }`
-    );
 
+    const addressText = addr
+      ? `${addr.address || ""}, ${addr.city || ""}, ${addr.state || ""}, ${addr.pincode || ""}`
+      : "N/A";
+
+    write(`Address: ${addressText}`);
     y -= 10;
 
     // ---------------------------
@@ -575,14 +593,10 @@ export const downloadEmployeeReport = async (req, res) => {
     write(`Report Type: ${report.reportType || "N/A"}`);
     write(`Frequency: ${report.frequency || "N/A"}`);
 
-    write(
-      `Date Range: ${
-        report.fromDate ? new Date(report.fromDate).toLocaleDateString() : "N/A"
-      } to ${
-        report.toDate ? new Date(report.toDate).toLocaleDateString() : "N/A"
-      }`
-    ); // FIXED "→"
+    const from = report.fromDate ? new Date(report.fromDate).toLocaleDateString() : "N/A";
+    const to = report.toDate ? new Date(report.toDate).toLocaleDateString() : "N/A";
 
+    write(`Date Range: ${from} to ${to}`);
     y -= 10;
 
     // ---------------------------
@@ -591,30 +605,35 @@ export const downloadEmployeeReport = async (req, res) => {
     write("Location", 16);
     write(`Latitude: ${report.location?.latitude || "N/A"}`);
     write(`Longitude: ${report.location?.longitude || "N/A"}`);
+    y -= 10;
 
-    // ---------------------------
+    // ========================================================
     // ATTACHED IMAGES
-    // ---------------------------
+    // ========================================================
     if (report.images?.length) {
       for (let img of report.images) {
         if (!img?.data) continue;
 
         const imgPage = pdfDoc.addPage();
+        let embeddedImage;
 
-        let embedded;
         try {
-          if (img.contentType.includes("png")) {
-            embedded = await pdfDoc.embedPng(img.data);
+          if (img.contentType === "image/png") {
+            embeddedImage = await pdfDoc.embedPng(img.data);
+          } else if (img.contentType === "image/jpeg" || img.contentType === "image/jpg") {
+            embeddedImage = await pdfDoc.embedJpg(img.data);
           } else {
-            embedded = await pdfDoc.embedJpg(img.data);
+            console.log("Unsupported image type:", img.contentType);
+            continue;
           }
         } catch (e) {
+          console.log("Image embed failed:", e.message);
           continue;
         }
 
-        const dims = embedded.scale(0.4);
+        const dims = embeddedImage.scale(0.5);
 
-        imgPage.drawImage(embedded, {
+        imgPage.drawImage(embeddedImage, {
           x: 50,
           y: 150,
           width: dims.width,
@@ -623,25 +642,26 @@ export const downloadEmployeeReport = async (req, res) => {
       }
     }
 
-    // ---------------------------
+    // ========================================================
     // BILL COPY
-    // ---------------------------
+    // ========================================================
     if (report.billCopy?.data) {
       const billPage = pdfDoc.addPage();
+      let embeddedBill;
 
-      let embedded;
       try {
-        if (report.billCopy.contentType.includes("png")) {
-          embedded = await pdfDoc.embedPng(report.billCopy.data);
+        if (report.billCopy.contentType === "image/png") {
+          embeddedBill = await pdfDoc.embedPng(report.billCopy.data);
         } else {
-          embedded = await pdfDoc.embedJpg(report.billCopy.data);
+          embeddedBill = await pdfDoc.embedJpg(report.billCopy.data);
         }
-      } catch {}
+      } catch (e) {
+        console.log("Bill copy embed failed:", e.message);
+      }
 
-      if (embedded) {
-        const dims = embedded.scale(0.4);
-
-        billPage.drawImage(embedded, {
+      if (embeddedBill) {
+        const dims = embeddedBill.scale(0.5);
+        billPage.drawImage(embeddedBill, {
           x: 50,
           y: 150,
           width: dims.width,
@@ -662,12 +682,103 @@ export const downloadEmployeeReport = async (req, res) => {
     );
 
     return res.end(Buffer.from(pdfBytes));
+
   } catch (error) {
     console.error("PDF Download Error:", error);
-
     return res.status(500).json({
       message: "Failed generating report PDF",
       error: error.message
+    });
+  }
+};
+export const downloadEmployeeReportsExcel = async (req, res) => {
+  try {
+    const employeeId = req.user.id;
+
+    // Fetch all reports for employee
+    const reports = await EmployeeReport.find({ employeeId })
+      .populate("campaignId", "name type")
+      .populate("retailerId", "name contactNo shopDetails")
+      .sort({ createdAt: -1 });
+
+    if (!reports.length) {
+      return res.status(404).json({ message: "No reports found for this employee" });
+    }
+
+    // Convert reports to Excel rows
+    const data = reports.map((report) => ({
+      ReportID: report._id.toString(),
+      CampaignName: report.campaignId?.name || "N/A",
+      CampaignType: report.campaignId?.type || "N/A",
+
+      RetailerName: report.retailerId?.name || "N/A",
+      RetailerContact: report.retailerId?.contactNo || "N/A",
+
+      RetailerAddress: report.retailerId?.shopDetails?.shopAddress
+        ? `${report.retailerId.shopDetails.shopAddress.address || ""}, ${
+            report.retailerId.shopDetails.shopAddress.city || ""
+          }, ${report.retailerId.shopDetails.shopAddress.state || ""}, ${
+            report.retailerId.shopDetails.shopAddress.pincode || ""
+          }`
+        : "N/A",
+
+      VisitType: report.visitType || "N/A",
+      Attended: report.attended ? "Yes" : "No",
+      NotVisitedReason: report.notVisitedReason || "N/A",
+
+      ReportType: report.reportType || "N/A",
+      Frequency: report.frequency || "N/A",
+
+      FromDate: report.fromDate
+        ? new Date(report.fromDate).toLocaleDateString()
+        : "N/A",
+      ToDate: report.toDate
+        ? new Date(report.toDate).toLocaleDateString()
+        : "N/A",
+
+      StockType: report.stockType || "N/A",
+      Brand: report.brand || "N/A",
+      Product: report.product || "N/A",
+      SKU: report.sku || "N/A",
+      ProductType: report.productType || "N/A",
+      Quantity: report.quantity || "N/A",
+
+      Latitude: report.location?.latitude || "N/A",
+      Longitude: report.location?.longitude || "N/A",
+
+      CreatedAt: new Date(report.createdAt).toLocaleString(),
+    }));
+
+    // Convert JSON → Sheet → Workbook
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Reports");
+
+    // Generate Excel buffer
+    const excelBuffer = XLSX.write(workbook, {
+      type: "buffer",
+      bookType: "xlsx",
+    });
+
+    // Required headers for file download
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    res.setHeader(
+      "Content-Disposition",
+      "attachment; filename=employee_reports.xlsx"
+    );
+    res.setHeader("Content-Length", excelBuffer.length);
+
+    // MUST use res.end() for Hoppscotch/Postman downloads
+    return res.end(excelBuffer);
+
+  } catch (error) {
+    console.error("Excel Download Error:", error);
+    return res.status(500).json({
+      message: "Failed to generate Excel file",
+      error: error.message,
     });
   }
 };
