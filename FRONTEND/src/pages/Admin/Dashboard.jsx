@@ -26,6 +26,7 @@ import EditJob from "./EditJob";
 import JobTracking from "./JobTracking";
 import JobDetails from "./JobDetails";
 import BulkUpload from "./BulkUpload";
+import ManageReports from "../Campaign/ManageReports";
 
 const Dashboard = () => {
     const [openMenu, setOpenMenu] = useState("");
@@ -124,7 +125,8 @@ const Dashboard = () => {
                 return <MapEmployee />;
             case "scheduleUnscheduleTask":
                 return <ScheduleUnscheduleTask />;
-
+            case "manageReports":
+                return <ManageReports />;
             case "editCampaign":
                 return (
                     <UpdateCampaign
@@ -436,6 +438,21 @@ const Dashboard = () => {
                                         }`}
                                     >
                                         Schedule / Unschedule Task
+                                    </li>
+                                    <li
+                                        onClick={() =>
+                                            setSelectedComponent(
+                                                "manageReports"
+                                            )
+                                        }
+                                        className={`hover:text-[#E4002B] cursor-pointer ${
+                                            selectedComponent ===
+                                            "manageReports"
+                                                ? "text-[#E4002B] font-semibold"
+                                                : ""
+                                        }`}
+                                    >
+                                        Manage Reports
                                     </li>
                                 </ul>
                             )}
