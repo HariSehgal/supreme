@@ -51,13 +51,13 @@ const UpdateCampaign = ({ onEdit }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 pt-4 px-4 md:px-10 pb-10">
+    <div className="min-h-screen bg-[#171717] pt-4 px-4 md:px-10 pb-10">
       <h1 className="text-2xl font-bold mb-6 text-center text-[#E4002B]">
         Edit Campaigns
       </h1>
 
       {loading ? (
-        <p className="text-gray-600 text-center text-lg">Loading campaigns...</p>
+        <p className="text-gray-200 text-center text-lg">Loading campaigns...</p>
       ) : error ? (
         <p className="text-red-500 text-center text-lg">{error}</p>
       ) : campaigns.length === 0 ? (
@@ -67,7 +67,7 @@ const UpdateCampaign = ({ onEdit }) => {
           {campaigns.map((c) => (
             <div
               key={c._id}
-              className="bg-white shadow-md rounded-xl border border-gray-200 p-6 hover:shadow-lg transition 
+              className="bg-[#EDEDED] shadow-md rounded-xl border border-gray-200 p-6 hover:shadow-lg transition 
               h-full flex flex-col justify-between"
             >
               <h3 className="text-xl font-bold text-gray-900 mb-1">{c.name}</h3>

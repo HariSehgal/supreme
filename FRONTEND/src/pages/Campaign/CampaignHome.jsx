@@ -75,7 +75,7 @@ const CampaignHome = () => {
             {campaigns.map((c) => (
               <div
                 key={c._id}
-                className="bg-white shadow-md rounded-xl border border-gray-200 p-6 hover:shadow-lg transition 
+                className="bg-[#EDEDED] shadow-md rounded-xl border border-gray-200 p-6 hover:shadow-lg transition 
   h-full flex flex-col justify-between"
               >
                 {/* Title */}

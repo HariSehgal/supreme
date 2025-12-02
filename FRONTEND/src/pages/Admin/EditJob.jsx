@@ -35,7 +35,7 @@ const EditJob = ({ jobId, onBack }) => {  // ✅ receive jobId and onBack as pro
         );
 
         if (res.status === 404) {
-          setError("❌ Job not found.");
+          setError("Job not found.");
           return;
         }
 
@@ -56,7 +56,7 @@ const EditJob = ({ jobId, onBack }) => {  // ✅ receive jobId and onBack as pro
         });
       } catch (err) {
         console.error("Fetch job error:", err);
-        setError("⚠️ Something went wrong while fetching job details.");
+        setError("Something went wrong while fetching job details.");
       } finally {
         setLoading(false);
       }
@@ -95,33 +95,31 @@ const EditJob = ({ jobId, onBack }) => {  // ✅ receive jobId and onBack as pro
       const data = await res.json();
 
       if (!res.ok) {
-        toast.error(data.message || "❌ Failed to update job.", { theme: "dark" });
+        toast.error(data.message || "Failed to update job.", { theme: "dark" });
         return;
       }
 
-      toast.success("✅ Job updated successfully!", { theme: "dark" });
-
+      toast.success("Job updated successfully!", { theme: "dark" });
       setTimeout(() => {
-        if (onBack) onBack(); // ✅ go back to UpdateJob view inside dashboard
+        if (onBack) onBack(); // 
       }, 1500);
     } catch (err) {
       console.error("Update job error:", err);
-      toast.error("⚠️ Failed to update job. Please try again.", { theme: "dark" });
+      toast.error("Failed to update job. Please try again.", { theme: "dark" });
     } finally {
       setSaving(false);
     }
   };
 
-  // ✅ UI
   if (loading)
-    return <div className="text-center mt-20 text-gray-500">Loading job details...</div>;
+    return <div className="text-center mt-20 text-gray-200">Loading job details...</div>;
   if (error)
     return <div className="text-center mt-20 text-red-500 font-semibold">{error}</div>;
 
   return (
     <>
       <ToastContainer />
-      <div className="min-h-screen bg-gray-50 pt-10 px-6 md:px-20 pb-10">
+      <div className="min-h-screen bg-[#171717] pt-10 px-6 md:px-20 pb-10">
         <button
           onClick={onBack}
           className="flex items-center gap-2 text-[#E4002B] mb-6 font-medium hover:underline"
@@ -129,7 +127,7 @@ const EditJob = ({ jobId, onBack }) => {  // ✅ receive jobId and onBack as pro
           <FaArrowLeft /> Back to Jobs
         </button>
 
-        <div className="bg-white shadow-sm border border-gray-200 rounded-xl p-6 space-y-5">
+        <div className="bg-[#EDEDED] shadow-sm border-2 border-gray-500 rounded-xl p-6 space-y-5">
           <h1 className="text-2xl font-bold mb-4 text-center mb-8 text-[#E4002B]">{"Edit Job"}</h1>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

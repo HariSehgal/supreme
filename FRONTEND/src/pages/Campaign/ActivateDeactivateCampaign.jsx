@@ -64,7 +64,7 @@ const ActivateDeactivateCampaign = ({ campaignId, onBack }) => {
         toast.error(data.message || "Update failed", { theme: "dark" });
       } else {
         setCampaign(data.campaign);
-        toast.success("Status updated ✅", { theme: "dark" });
+        toast.success("Status updated", { theme: "dark" });
       }
     } catch (err) {
       console.log(err);
@@ -74,10 +74,10 @@ const ActivateDeactivateCampaign = ({ campaignId, onBack }) => {
     setSaving(false);
   };
 
-  if (!campaign) return <p className="text-center mt-10">Loading...</p>;
+  if (!campaign) return <p className="text-center mt-10 text-gray-200">Loading...</p>;
 
   return (
-    <div className="p-6">
+    <div className="bg-[#EDEDED] p-6 shadow-md rounded-xl border max-w-3xl mx-auto w-full">
       <ToastContainer />
 
       <button

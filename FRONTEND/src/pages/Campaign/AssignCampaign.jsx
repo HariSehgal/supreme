@@ -203,6 +203,17 @@ const AssignCampaign = () => {
       );
     }
 
+    // ✅ Add assignment status to each retailer
+    filtered = filtered.map((r) => {
+      const assignedRetailer = selectedCampaign?.data?.assignedRetailers?.find(
+        (ar) => ar.retailerId === r._id || ar.retailerId?._id === r._id
+      );
+      return {
+        ...r,
+        assignmentStatus: assignedRetailer ? assignedRetailer.status : "not_assigned"
+      };
+    });
+
     setTableData(filtered);
 
     if (filtered.length === 0) {
@@ -229,6 +240,17 @@ const AssignCampaign = () => {
           e.email?.toLowerCase().includes(query)
       );
     }
+
+    // ✅ Add assignment status to each employee
+    filtered = filtered.map((e) => {
+      const assignedEmployee = selectedCampaign?.data?.assignedEmployees?.find(
+        (ae) => ae.employeeId === e._id || ae.employeeId?._id === e._id
+      );
+      return {
+        ...e,
+        assignmentStatus: assignedEmployee ? assignedEmployee.status : "not_assigned"
+      };
+    });
 
     setEmployeeTableData(filtered);
 
@@ -286,7 +308,17 @@ const AssignCampaign = () => {
   }, [employeeTableData]);
 
   // ✅ Handle individual checkbox toggle
-  const handleCheckboxChange = (retailerId) => {
+  // ✅ Handle individual checkbox toggle
+  const handleCheckboxChange = (retailerId, assignmentStatus) => {
+    // Check if already assigned
+    if (assignmentStatus && assignmentStatus !== "not_assigned") {
+      toast.warning(
+        `This retailer is already ${assignmentStatus} for this campaign!`,
+        { theme: "dark", autoClose: 3000 }
+      );
+      return;
+    }
+
     setSelectedRetailers((prev) => {
       if (prev.includes(retailerId)) {
         return prev.filter((id) => id !== retailerId);
@@ -299,19 +331,51 @@ const AssignCampaign = () => {
   // ✅ Handle select all checkbox
   const handleSelectAll = (e) => {
     if (e.target.checked) {
-      const allIds = tableData.map((r) => r._id);
-      setSelectedRetailers(allIds);
+      // Only select retailers that are NOT already assigned
+      const selectableIds = tableData
+        .filter((r) => r.assignmentStatus === "not_assigned")
+        .map((r) => r._id);
+
+      if (selectableIds.length === 0) {
+        toast.info("All displayed retailers are already assigned to this campaign", {
+          theme: "dark"
+        });
+        return;
+      }
+
+      const alreadyAssignedCount = tableData.length - selectableIds.length;
+      if (alreadyAssignedCount > 0) {
+        toast.info(
+          `${alreadyAssignedCount} retailer(s) skipped (already assigned)`,
+          { theme: "dark" }
+        );
+      }
+
+      setSelectedRetailers(selectableIds);
     } else {
       setSelectedRetailers([]);
     }
   };
 
   // ✅ Check if all visible retailers are selected
-  const isAllSelected = tableData.length > 0 && selectedRetailers.length === tableData.length;
-  const isSomeSelected = selectedRetailers.length > 0 && selectedRetailers.length < tableData.length;
+  // ✅ Check if all visible retailers are selected
+  const selectableRetailers = tableData.filter((r) => r.assignmentStatus === "not_assigned");
+  const isAllSelected = selectableRetailers.length > 0 &&
+    selectedRetailers.length === selectableRetailers.length &&
+    selectableRetailers.every((r) => selectedRetailers.includes(r._id));
+  const isSomeSelected = selectedRetailers.length > 0 && !isAllSelected;
 
   // ✅ Handle employee checkbox toggle
-  const handleEmployeeCheckboxChange = (employeeId) => {
+  const handleEmployeeCheckboxChange = (employeeId, assignmentStatus) => {
+    // Check if already assigned
+    if (assignmentStatus && assignmentStatus !== "not_assigned") {
+      toast.warning(
+        `This employee is already ${assignmentStatus} for this campaign!`,
+        { theme: "dark", autoClose: 3000 }
+      );
+      return;
+    }
+
     setSelectedEmployees((prev) => {
       if (prev.includes(employeeId)) {
         return prev.filter((id) => id !== employeeId);
@@ -324,16 +388,38 @@ const AssignCampaign = () => {
   // ✅ Handle employee select all
   const handleEmployeeSelectAll = (e) => {
     if (e.target.checked) {
-      const allIds = employeeTableData.map((emp) => emp._id);
-      setSelectedEmployees(allIds);
+      // Only select employees that are NOT already assigned
+      const selectableIds = employeeTableData
+        .filter((emp) => emp.assignmentStatus === "not_assigned")
+        .map((emp) => emp._id);
+
+      if (selectableIds.length === 0) {
+        toast.info("All displayed employees are already assigned to this campaign", {
+          theme: "dark"
+        });
+        return;
+      }
+
+      const alreadyAssignedCount = employeeTableData.length - selectableIds.length;
+      if (alreadyAssignedCount > 0) {
+        toast.info(
+          `${alreadyAssignedCount} employee(s) skipped (already assigned)`,
+          { theme: "dark" }
+        );
+      }
+
+      setSelectedEmployees(selectableIds);
     } else {
       setSelectedEmployees([]);
     }
   };
 
   // ✅ Check if all visible employees are selected
-  const isAllEmployeesSelected = employeeTableData.length > 0 && selectedEmployees.length === employeeTableData.length;
-  const isSomeEmployeesSelected = selectedEmployees.length > 0 && selectedEmployees.length < employeeTableData.length;
+  const selectableEmployees = employeeTableData.filter((e) => e.assignmentStatus === "not_assigned");
+  const isAllEmployeesSelected = selectableEmployees.length > 0 &&
+    selectedEmployees.length === selectableEmployees.length &&
+    selectableEmployees.every((e) => selectedEmployees.includes(e._id));
+  const isSomeEmployeesSelected = selectedEmployees.length > 0 && !isAllEmployeesSelected;
 
   const handleAssign = async () => {
     if (!selectedCampaign) {
@@ -440,13 +526,13 @@ const AssignCampaign = () => {
   return (
     <>
       <ToastContainer position="top-right" autoClose={3000} />
-      <div className="min-h-screen bg-gray-50 p-6">
+      <div className="min-h-screen bg-[#171717] p-6">
         <div className="max-w-7xl mx-auto">
-          <h1 className="text-3xl font-bold text-gray-800 mb-8">
+          <h1 className="text-3xl font-bold text-[#E4002B] mb-8">
             Assign Campaign
           </h1>
 
-          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+          <div className="bg-[#EDEDED] rounded-lg shadow-md p-6 mb-6">
             <h2 className="text-lg font-semibold mb-4 text-gray-700">
               Select Campaign *
             </h2>
@@ -485,7 +571,7 @@ const AssignCampaign = () => {
           </div>
 
           {selectedCampaign && (
-            <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="bg-[#EDEDED] rounded-lg shadow-md p-6">
               <h2 className="text-lg font-semibold mb-4 text-gray-700">
                 Assignment Type *
               </h2>
@@ -762,53 +848,78 @@ const AssignCampaign = () => {
                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Outlet Name</th>
                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Retailer Name</th>
                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Business Type</th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">City</th>
                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">State</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                  Status
+                                </th>
                               </tr>
                             </thead>
 
                             <tbody className="bg-white divide-y divide-gray-200">
-                              {tableData.map((r, index) => (
-                                <tr
-                                  key={r._id}
-                                  className={`hover:bg-gray-50 ${selectedRetailers.includes(r._id) ? "bg-red-50" : ""}`}
-                                >
-                                  <td className="px-4 py-3">
-                                    <input
-                                      type="checkbox"
-                                      checked={selectedRetailers.includes(r._id)}
-                                      onChange={() => handleCheckboxChange(r._id)}
-                                      className="w-4 h-4 cursor-pointer"
-                                    />
-                                  </td>
+                              {tableData.map((r, index) => {
+                                const isAlreadyAssigned = r.assignmentStatus !== "not_assigned";
+                                return (
+                                  <tr
+                                    key={r._id}
+                                    className={`hover:bg-gray-50 ${selectedRetailers.includes(r._id)
+                                      ? "bg-red-50"
+                                      : isAlreadyAssigned
+                                        ? "bg-gray-100 opacity-60"
+                                        : ""
+                                      }`}
+                                  >
+                                    <td className="px-4 py-3">
+                                      <input
+                                        type="checkbox"
+                                        checked={selectedRetailers.includes(r._id)}
+                                        onChange={() => handleCheckboxChange(r._id, r.assignmentStatus)}
+                                        disabled={isAlreadyAssigned}
+                                        className={`w-4 h-4 ${isAlreadyAssigned ? "cursor-not-allowed" : "cursor-pointer"
+                                          }`}
+                                      />
+                                    </td>
 
-                                  <td className="px-4 py-3 text-sm">{index + 1}</td>
+                                    <td className="px-4 py-3 text-sm">{index + 1}</td>
 
-                                  <td className="px-4 py-3 text-sm font-medium text-gray-700">
-                                    {r.uniqueId || "-"}
-                                  </td>
+                                    <td className="px-4 py-3 text-sm font-medium text-gray-700">
+                                      {r.uniqueId || "-"}
+                                    </td>
 
-                                  <td className="px-4 py-3 text-sm font-medium text-gray-700">
-                                    {r.shopDetails?.shopName || "-"}
-                                  </td>
+                                    <td className="px-4 py-3 text-sm font-medium text-gray-700">
+                                      {r.shopDetails?.shopName || "-"}
+                                    </td>
 
-                                  <td className="px-4 py-3 text-sm text-gray-700">
-                                    {r.name || "-"}
-                                  </td>
+                                    <td className="px-4 py-3 text-sm text-gray-700">
+                                      {r.name || "-"}
+                                    </td>
 
-                                  <td className="px-4 py-3 text-sm text-gray-600">
-                                    {r.shopDetails?.businessType || "-"}
-                                  </td>
+                                    <td className="px-4 py-3 text-sm text-gray-600">
+                                      {r.shopDetails?.businessType || "-"}
+                                    </td>
 
-                                  <td className="px-4 py-3 text-sm text-gray-600">
-                                    {r.shopDetails?.shopAddress?.city || "-"}
-                                  </td>
+                                    <td className="px-4 py-3 text-sm text-gray-600">
+                                      {r.shopDetails?.shopAddress?.state || "-"}
+                                    </td>
 
-                                  <td className="px-4 py-3 text-sm text-gray-600">
-                                    {r.shopDetails?.shopAddress?.state || "-"}
-                                  </td>
-                                </tr>
-                              ))}
+                                    <td className="px-4 py-3 text-sm">
+                                      {r.assignmentStatus === "not_assigned" ? (
+                                        <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-700">
+                                          Available
+                                        </span>
+                                      ) : (
+                                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${r.assignmentStatus === "pending"
+                                          ? "bg-yellow-100 text-yellow-700"
+                                          : r.assignmentStatus === "accepted"
+                                            ? "bg-blue-100 text-blue-700"
+                                            : "bg-red-100 text-red-700"
+                                          }`}>
+                                          {r.assignmentStatus.charAt(0).toUpperCase() + r.assignmentStatus.slice(1)}
+                                        </span>
+                                      )}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
                             </tbody>
                           </table>
                         </div>
@@ -830,7 +941,7 @@ const AssignCampaign = () => {
                   </div>
                 )}
               {(loadingEmployees || employeeTableData.length > 0) &&
-                assignTarget === "employee" && (
+                assignTarget === "employee" && assignType === "individual" && (
                   <div className="bg-white rounded-lg shadow-md p-6 mt-6">
                     <div className="flex justify-between items-center mb-4">
                       <h2 className="text-lg font-semibold text-gray-700">
@@ -868,47 +979,75 @@ const AssignCampaign = () => {
                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">State</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                               </tr>
                             </thead>
 
                             <tbody className="bg-white divide-y divide-gray-200">
-                              {employeeTableData.map((e, index) => (
-                                <tr
-                                  key={e._id}
-                                  className={`hover:bg-gray-50 ${selectedEmployees.includes(e._id) ? "bg-red-50" : ""}`}
-                                >
-                                  <td className="px-4 py-3">
-                                    <input
-                                      type="checkbox"
-                                      checked={selectedEmployees.includes(e._id)}
-                                      onChange={() => handleEmployeeCheckboxChange(e._id)}
-                                      className="w-4 h-4 cursor-pointer"
-                                    />
-                                  </td>
+                              {employeeTableData.map((e, index) => {
+                                const isAlreadyAssigned = e.assignmentStatus !== "not_assigned";
+                                return (
+                                  <tr
+                                    key={e._id}
+                                    className={`hover:bg-gray-50 ${selectedEmployees.includes(e._id)
+                                      ? "bg-red-50"
+                                      : isAlreadyAssigned
+                                        ? "bg-gray-100 opacity-60"
+                                        : ""
+                                      }`}
+                                  >
+                                    <td className="px-4 py-3">
+                                      <input
+                                        type="checkbox"
+                                        checked={selectedEmployees.includes(e._id)}
+                                        onChange={() => handleEmployeeCheckboxChange(e._id, e.assignmentStatus)}
+                                        disabled={isAlreadyAssigned}
+                                        className={`w-4 h-4 ${isAlreadyAssigned ? "cursor-not-allowed" : "cursor-pointer"
+                                          }`}
+                                      />
+                                    </td>
 
-                                  <td className="px-4 py-3 text-sm">{index + 1}</td>
+                                    <td className="px-4 py-3 text-sm">{index + 1}</td>
 
-                                  <td className="px-4 py-3 text-sm font-medium text-gray-700">
-                                    {e.employeeId || "-"}
-                                  </td>
+                                    <td className="px-4 py-3 text-sm font-medium text-gray-700">
+                                      {e.employeeId || "-"}
+                                    </td>
 
-                                  <td className="px-4 py-3 text-sm text-gray-700">
-                                    {e.name || "-"}
-                                  </td>
+                                    <td className="px-4 py-3 text-sm text-gray-700">
+                                      {e.name || "-"}
+                                    </td>
 
-                                  <td className="px-4 py-3 text-sm text-gray-600">
-                                    {e.email || "-"}
-                                  </td>
+                                    <td className="px-4 py-3 text-sm text-gray-600">
+                                      {e.email || "-"}
+                                    </td>
 
-                                  <td className="px-4 py-3 text-sm text-gray-600">
-                                    {e.phone || "-"}
-                                  </td>
+                                    <td className="px-4 py-3 text-sm text-gray-600">
+                                      {e.phone || "-"}
+                                    </td>
 
-                                  <td className="px-4 py-3 text-sm text-gray-600">
-                                    {e.correspondenceAddress?.state || "-"}
-                                  </td>
-                                </tr>
-                              ))}
+                                    <td className="px-4 py-3 text-sm text-gray-600">
+                                      {e.correspondenceAddress?.state || "-"}
+                                    </td>
+
+                                    <td className="px-4 py-3 text-sm">
+                                      {e.assignmentStatus === "not_assigned" ? (
+                                        <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-700">
+                                          Available
+                                        </span>
+                                      ) : (
+                                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${e.assignmentStatus === "pending"
+                                          ? "bg-yellow-100 text-yellow-700"
+                                          : e.assignmentStatus === "accepted"
+                                            ? "bg-blue-100 text-blue-700"
+                                            : "bg-red-100 text-red-700"
+                                          }`}>
+                                          {e.assignmentStatus.charAt(0).toUpperCase() + e.assignmentStatus.slice(1)}
+                                        </span>
+                                      )}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
                             </tbody>
                           </table>
                         </div>

@@ -59,23 +59,23 @@ const UpdateJob = ({ onEditJob }) => {
   return (
     <>
       {/* Job Cards Section */}
-      <div className="min-h-screen bg-gray-50 pt-4 px-4 md:px-10 pb-10">
+      <div className="min-h-screen bg-[#171717] pt-4 px-4 md:px-10 pb-10">
         <h1 className="text-2xl font-bold mb-6 text-center text-[#E4002B]">
           Job Listings
         </h1>
 
         {loading ? (
-          <p className="text-gray-600">Loading jobs...</p>
+          <p className="text-gray-200">Loading jobs...</p>
         ) : error ? (
           <p className="text-red-500">{error}</p>
         ) : jobs.length === 0 ? (
-          <p className="text-gray-500">No active jobs found.</p>
+          <p className="text-gray-200">No active jobs found.</p>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {jobs.map((job) => (
               <div
                 key={job._id}
-                className="bg-white border border-gray-200 rounded-xl shadow-sm p-5 hover:shadow-md transition flex flex-col justify-between"
+                className="bg-[#EDEDED] border-2 border-gray-500 rounded-xl shadow-sm p-5 hover:shadow-md transition flex flex-col justify-between"
               >
                 <div>
                   {/* Job Title */}

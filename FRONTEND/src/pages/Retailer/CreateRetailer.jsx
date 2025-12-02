@@ -15,7 +15,6 @@ import {
     FaMapPin
 } from "react-icons/fa";
 import { IoClose } from "react-icons/io5";
-import { MdLocationOn } from "react-icons/md";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
@@ -293,7 +292,7 @@ const CreateRetailer = () => {
             const result = await response.json();
 
             if (response.ok) {
-                toast.success("✅ Notification sent & retailer initiated successfully!", { theme: "dark" });
+                toast.success("Notification sent & retailer initiated successfully!", { theme: "dark" });
 
                 setTimeout(() => {
                     resetForm();
@@ -333,7 +332,7 @@ const CreateRetailer = () => {
             <ToastContainer />
             
             <div className="flex justify-center items-center w-full">
-                <div className="w-full max-w-2xl bg-white shadow-md rounded-xl p-8">
+                <div className="w-full max-w-2xl bg-[#EDEDED] shadow-md rounded-xl p-8">
                     <h1 className="text-2xl font-bold text-[#E4002B] text-center mb-6">
                         Retailer Registration
                     </h1>
@@ -346,7 +345,7 @@ const CreateRetailer = () => {
                             <IconInput
                                 icon={FaUser}
                                 label={<>Name <span className="text-red-500">*</span></>}
-                                placeholder="Full name"
+                                placeholder="Enter your full name"
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
                                 required
@@ -355,7 +354,7 @@ const CreateRetailer = () => {
                             <IconInput
                                 icon={FaPhoneAlt}
                                 label={<>Contact No <span className="text-red-500">*</span></>}
-                                placeholder="+91 1234567890"
+                                placeholder="Enter your phone number"
                                 value={contactNo}
                                 onChange={(e) => setContactNo(e.target.value.replace(/\D/g, ""))}
                                 maxLength={10}
@@ -365,7 +364,7 @@ const CreateRetailer = () => {
                             <IconInput
                                 icon={FaBuilding}
                                 label={<>Shop Name <span className="text-red-500">*</span></>}
-                                placeholder="Shop name"
+                                placeholder="Enter your shop name"
                                 value={shopName}
                                 onChange={(e) => setShopName(e.target.value)}
                                 required
@@ -374,7 +373,7 @@ const CreateRetailer = () => {
                             <SearchableSelect
                                 icon={FaStore}
                                 label="Business Type"
-                                placeholder="Select business type"
+                                placeholder="Select or search business type"
                                 options={businessTypeOptions}
                                 value={businessType}
                                 onChange={setBusinessType}
@@ -384,7 +383,7 @@ const CreateRetailer = () => {
                             <IconInput
                                 icon={FaIdCard}
                                 label={<>PAN Card <span className="text-red-500">*</span></>}
-                                placeholder="ABCDE1234F"
+                                placeholder="Enter your PAN card number (e.g., ABCDE1234F)"
                                 value={panCard}
                                 onChange={(e) => {
                                     const val = e.target.value.toUpperCase();
@@ -407,8 +406,8 @@ const CreateRetailer = () => {
 
                             <IconInput
                                 icon={FaMapMarkerAlt}
-                                label={<>Address Line 1 <span className="text-red-500">*</span></>}
-                                placeholder="45, Main Market Road"
+                                label={<>Address <span className="text-red-500">*</span></>}
+                                placeholder="Enter your address"
                                 value={address1}
                                 onChange={(e) => setAddress1(e.target.value)}
                                 required

@@ -147,12 +147,12 @@ const EditCampaign = ({ campaignId, onBack }) => {
   return (
     <>
       <ToastContainer />
-      <div className="min-h-screen bg-gray-50 pt-8 px-6 md:px-20 pb-10">
-        <button onClick={onBack} className="flex items-center gap-2 text-[#E4002B] mb-6">
+      <div className="min-h-screen bg-[#171717] pt-8 px-6 md:px-20 pb-10">
+        <button onClick={onBack} className="flex items-center gap-2 text-[#E4002B] mb-6 hover:underline font-medium">
           <FaArrowLeft /> Back
         </button>
 
-        <div className="bg-white p-6 shadow-md rounded-xl border max-w-3xl mx-auto w-full">
+        <div className="bg-[#EDEDED] p-6 shadow-md rounded-xl border max-w-3xl mx-auto w-full">
           <h1 className="text-2xl font-bold text-[#E4002B] mb-6 text-center">Edit Campaign</h1>
 
           {loading ? (

@@ -221,7 +221,7 @@ const CreateCampaign = () => {
     <>
       <ToastContainer />
 
-      <div className="w-full max-w-lg bg-white shadow-md rounded-xl p-8 mx-auto">
+      <div className="w-full max-w-lg bg-[#EDEDED] shadow-md rounded-xl p-8 mx-auto">
         <div className="mb-8 text-center">
           <h1 className="text-2xl font-bold text-[#E4002B]">Create a Campaign</h1>
         </div>

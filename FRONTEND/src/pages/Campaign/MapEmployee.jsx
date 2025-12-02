@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import Select from "react-select";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import * as XLSX from 'xlsx-js-style'; 
 
 const customSelectStyles = {
     control: (provided, state) => ({
@@ -45,6 +46,16 @@ const MapEmployee = () => {
 
     const [filteredRetailers, setFilteredRetailers] = useState([]);
     const [filteredEmployees, setFilteredEmployees] = useState([]);
+
+    const [openOutletList, setOpenOutletList] = useState(null);
+
+    // Assigned Pairs Table States
+    const [assignedPairs, setAssignedPairs] = useState([]);
+    const [filteredPairs, setFilteredPairs] = useState([]);
+    const [searchAssignedPairs, setSearchAssignedPairs] = useState("");
+
+    const [pairStateFilter, setPairStateFilter] = useState(null);
+
 
     // ✅ Fetch Campaigns
     useEffect(() => {
@@ -90,6 +101,63 @@ const MapEmployee = () => {
         } finally {
             setLoadingCampaigns(false);
         }
+    };
+
+    // ✅ NEW: Check assignment status for each retailer
+    const checkRetailerAssignmentStatus = async (campaignId, retailers) => {
+        const token = localStorage.getItem("token");
+
+        const updatedRetailers = await Promise.all(
+            retailers.map(async (retailer) => {
+                try {
+                    const res = await fetch(
+                        `https://supreme-419p.onrender.com/api/admin/campaign/${campaignId}/retailer/${retailer._id}/employee`,
+                        {
+                            headers: { Authorization: `Bearer ${token}` },
+                        }
+                    );
+
+                    const data = await res.json();
+
+                    if (res.ok && data.isAssigned) {
+                        return {
+                            ...retailer,
+                            status: "assigned",
+                            assignedEmployee: data.employee,
+                            assignedAt: data.assignedAt
+                        };
+                    } else {
+                        return {
+                            ...retailer,
+                            status: retailer.status || "pending"
+                        };
+                    }
+                } catch (err) {
+                    console.error(`Error checking status for retailer ${retailer._id}:`, err);
+                    return {
+                        ...retailer,
+                        status: retailer.status || "pending"
+                    };
+                }
+            })
+        );
+
+        return updatedRetailers;
+    };
+
+    // ✅ ADD THIS RIGHT HERE
+    const fetchEmployeeRetailerMapping = async (campaignId) => {
+        const token = localStorage.getItem("token");
+
+        const res = await fetch(
+            `https://supreme-419p.onrender.com/api/admin/campaign/${campaignId}/employee-retailer-mapping`,
+            { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        const data = await res.json();
+        if (!res.ok) return [];
+
+        return data.employees;
     };
 
     const handleSelectRetailer = (retailerId) => {
@@ -158,6 +226,37 @@ const MapEmployee = () => {
         setFilteredEmployees(filtered);
     }, [stateFilter, searchEmployee, assignedEmployees]);
 
+    // 🔍 Filter Assigned Employee–Retailer Pairs Table
+    useEffect(() => {
+        if (!assignedPairs.length) {
+            setFilteredPairs([]);
+            return;
+        }
+
+        let filtered = [...assignedPairs];
+
+        // 🆕 Pair-specific state filter
+        if (pairStateFilter) {
+            filtered = filtered.filter(
+                (p) => p.retailer.shopDetails?.shopAddress?.state === pairStateFilter.value
+            );
+        }
+
+        // Search Filter
+        if (searchAssignedPairs.trim() !== "") {
+            const q = searchAssignedPairs.toLowerCase();
+            filtered = filtered.filter(
+                (p) =>
+                    p.retailer.uniqueId?.toLowerCase().includes(q) ||
+                    p.retailer.shopName?.toLowerCase().includes(q) ||
+                    p.employee.employeeId?.toLowerCase().includes(q) ||
+                    p.employee.name?.toLowerCase().includes(q)
+            );
+        }
+
+        setFilteredPairs(filtered);
+    }, [assignedPairs, pairStateFilter, searchAssignedPairs]);
+
     const handleCampaignChange = async (selected) => {
         setSelectedCampaign(selected);
 
@@ -175,6 +274,8 @@ const MapEmployee = () => {
         }
 
         setLoadingAssignedData(true);
+
+        // Reset data
         setAssignedRetailers([]);
         setFilteredRetailers([]);
         setSelectedRetailers([]);
@@ -187,6 +288,8 @@ const MapEmployee = () => {
 
         try {
             const token = localStorage.getItem("token");
+
+            // 1️⃣ Fetch retailers + employees
             const res = await fetch(
                 `https://supreme-419p.onrender.com/api/admin/campaign/${selected.value}/retailers-with-employees`,
                 { headers: { Authorization: `Bearer ${token}` } }
@@ -195,17 +298,71 @@ const MapEmployee = () => {
             const data = await res.json();
 
             if (!res.ok) {
-                toast.error(data.message || "Error loading campaign data", { theme: "dark" });
+                toast.error(data.message || "Error loading campaign data", {
+                    theme: "dark",
+                });
                 return;
             }
 
-            // 💡 Set initial retailer/employee data properly
             const retailers = data.retailers || [];
             const employees = data.employees || [];
-            setAssignedRetailers(retailers);
-            setFilteredRetailers(retailers);
-            setAssignedEmployees(employees);
-            setFilteredEmployees(employees);
+
+            // 2️⃣ Check retailer assignment status
+            const retailersWithStatus = await checkRetailerAssignmentStatus(
+                selected.value,
+                retailers
+            );
+
+            setAssignedRetailers(retailersWithStatus);
+            setFilteredRetailers(retailersWithStatus);
+
+            // 3️⃣ Fetch employee → retailer mapping API
+            const mapping = await fetchEmployeeRetailerMapping(selected.value);
+
+            // 4️⃣ Merge mapping with employees
+            const employeesWithOutletCounts = employees.map((emp) => {
+                const found = mapping.find((m) => m._id === emp._id);
+
+                return {
+                    ...emp,
+                    outletCount: found ? found.retailers.length : 0,
+                    outletList: found ? found.retailers : [],
+                };
+            });
+
+            // 5️⃣ Update state
+            setAssignedEmployees(employeesWithOutletCounts);
+            setFilteredEmployees(employeesWithOutletCounts);
+
+            // 🆕 Fetch Employee–Retailer Mapping for Assigned Pairs Table
+            const mappingForPairs = await fetchEmployeeRetailerMapping(selected.value);
+
+            // 🆕 Flatten employee → retailer mapping into row pairs for table
+            const assigned = [];
+
+            mappingForPairs.forEach(emp => {
+                if (Array.isArray(emp.retailers)) {
+                    emp.retailers.forEach(ret => {
+                        assigned.push({
+                            employee: {
+                                _id: emp._id,
+                                name: emp.name,
+                                employeeId: emp.employeeId,
+                            },
+                            retailer: {
+                                _id: ret._id,
+                                uniqueId: ret.uniqueId,
+                                shopName: ret.shopDetails?.shopName,
+                                state: ret.shopDetails?.shopAddress?.state,   // ✅ ADD THIS
+                            },
+                            assignedAt: ret.assignedAt
+                        });
+                    });
+                }
+            });
+
+            setAssignedPairs(assigned);
+            setFilteredPairs(assigned);
 
         } catch (err) {
             toast.error("Server error. Try again.", { theme: "dark" });
@@ -257,10 +414,12 @@ const MapEmployee = () => {
                 } else {
                     toast.success("Assigned Successfully!", { theme: "dark" });
 
-                    // Update table UI: Change status to "assigned"
+                    // ✅ Update table UI with proper assigned status
                     setAssignedRetailers((prev) =>
                         prev.map((r) =>
-                            r._id === retailerId ? { ...r, status: "assigned" } : r
+                            r._id === retailerId
+                                ? { ...r, status: "assigned", assignedEmployee: data.employee }
+                                : r
                         )
                     );
                 }
@@ -274,16 +433,98 @@ const MapEmployee = () => {
         setSelectedRetailers([]);
     };
 
+    const handleDownloadFilteredReport = () => {
+        if (!filteredPairs.length) {
+            toast.error("No data to download", { theme: "dark" });
+            return;
+        }
+
+        // Convert filteredPairs → Excel row data
+        const rows = filteredPairs.map((p, index) => ({
+            SNo: index + 1,
+            OutletCode: p.retailer.uniqueId,
+            OutletName: p.retailer.shopName,
+            State: p.retailer.state,
+            EmployeeCode: p.employee.employeeId,
+            EmployeeName: p.employee.name,
+            AssignedAt: p.assignedAt
+                ? new Date(p.assignedAt).toLocaleString()
+                : "",
+        }));
+
+        // Create worksheet
+        const ws = XLSX.utils.json_to_sheet(rows);
+
+        // -----------------------------
+        // STYLING DEFINITIONS
+        // -----------------------------
+        const headerStyle = {
+            font: { bold: true },
+            alignment: { horizontal: "center", vertical: "center" },
+            fill: { fgColor: { rgb: "E2E8F0" } } // Optional: light gray background
+        };
+
+        const dataStyle = {
+            alignment: { horizontal: "center", vertical: "center" }
+        };
+
+        // -----------------------------
+        // APPLY HEADER STYLES
+        // -----------------------------
+        const headerCells = ["A1", "B1", "C1", "D1", "E1", "F1", "G1"];
+        headerCells.forEach((cell) => {
+            if (ws[cell]) {
+                ws[cell].s = headerStyle;
+            }
+        });
+
+        // -----------------------------
+        // APPLY DATA CELL STYLES
+        // -----------------------------
+        const range = XLSX.utils.decode_range(ws['!ref']);
+        for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+            for (let C = range.s.c; C <= range.e.c; ++C) {
+                const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+                if (ws[cellAddress]) {
+                    ws[cellAddress].s = dataStyle;
+                }
+            }
+        }
+
+        // -----------------------------
+        // COLUMN WIDTHS
+        // -----------------------------
+        ws["!cols"] = [
+            { wpx: 60 },   // S.No
+            { wpx: 120 },  // Outlet Code
+            { wpx: 180 },  // Outlet Name
+            { wpx: 100 },  // State
+            { wpx: 120 },  // Employee Code
+            { wpx: 150 },  // Employee Name
+            { wpx: 160 },  // Assigned At
+        ];
+
+        // Create workbook
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Filtered Mapping");
+
+        // Download Excel
+        XLSX.writeFile(
+            wb,
+            `employee_retailer_filtered_${selectedCampaign.value}.xlsx`
+        );
+    };
+
     return (
         <>
             <ToastContainer position="top-right" autoClose={3000} />
-            <div className="min-h-screen bg-gray-50 p-6">
+            <div className="min-h-screen bg-[#171717] p-6">
                 <div className="max-w-7xl mx-auto">
-                    <h1 className="text-3xl font-bold text-gray-800 mb-8">
+                    <h1 className="text-3xl font-bold text-[#E4002B] mb-8">
                         Map Employee to Retailer
                     </h1>
 
-                    <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+                    <div className="bg-[#EDEDED] rounded-lg shadow-md p-6 mb-6">
                         <h2 className="text-lg font-semibold mb-4 text-gray-700">
                             Select Campaign *
                         </h2>
@@ -325,7 +566,7 @@ const MapEmployee = () => {
                     {selectedCampaign && (
                         <>
                             {/* Common State Filter */}
-                            <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+                            <div className="bg-[#EDEDED] rounded-lg shadow-md p-6 mb-6">
                                 <h2 className="text-lg font-semibold mb-4 text-gray-700">
                                     Common Filter
                                 </h2>
@@ -363,7 +604,7 @@ const MapEmployee = () => {
                             </div>
 
                             {/* Retailer Table */}
-                            <div className="bg-white shadow-md rounded-lg p-6 mb-6">
+                            <div className="bg-[#EDEDED] shadow-md rounded-lg p-6 mb-6">
                                 <h3 className="text-lg font-semibold text-gray-700 mb-4">
                                     Select Retailers ({filteredRetailers.length} of {assignedRetailers.length})
                                 </h3>
@@ -388,7 +629,7 @@ const MapEmployee = () => {
                                 </div>
 
                                 {loadingAssignedData ? (
-                                    <p className="text-gray-500 py-3">Loading...</p>
+                                    <p className="text-gray-500 py-3">Loading retailers and checking assignment status...</p>
                                 ) : assignedRetailers.length === 0 ? (
                                     <p className="text-gray-500 py-3">No retailers assigned yet.</p>
                                 ) : filteredRetailers.length === 0 ? (
@@ -417,8 +658,8 @@ const MapEmployee = () => {
                                                                 checked={selectedRetailers.includes(r._id)}
                                                                 onChange={() => handleSelectRetailer(r._id)}
                                                                 className={`w-4 h-4 cursor-pointer ${r.status?.toLowerCase() === "assigned"
-                                                                        ? "cursor-not-allowed opacity-50"
-                                                                        : ""
+                                                                    ? "cursor-not-allowed opacity-50"
+                                                                    : ""
                                                                     }`}
                                                             />
                                                         </td>
@@ -461,7 +702,7 @@ const MapEmployee = () => {
                             </div>
 
                             {/* Employee Table */}
-                            <div className="bg-white shadow-md rounded-lg p-6">
+                            <div className="bg-[#EDEDED] shadow-md rounded-lg p-6">
                                 <h3 className="text-lg font-semibold text-gray-700 mb-4">
                                     Select Employee ({filteredEmployees.length} of {assignedEmployees.length})
                                 </h3>
@@ -500,10 +741,11 @@ const MapEmployee = () => {
                                                     <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">S.No</th>
                                                     <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Employee Code</th>
                                                     <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Employee Name</th>
-                                                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
                                                     <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
                                                     <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">State</th>
-                                                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                                                        Outlets Assigned
+                                                    </th>
                                                 </tr>
                                             </thead>
                                             <tbody className="bg-white divide-y divide-gray-200">
@@ -521,10 +763,20 @@ const MapEmployee = () => {
                                                         <td className="px-4 py-2 text-sm">{i + 1}</td>
                                                         <td className="px-4 py-2 text-sm font-medium text-gray-700">{e.employeeId || "-"}</td>
                                                         <td className="px-4 py-2 text-sm text-gray-700">{e.name}</td>
-                                                        <td className="px-4 py-2 text-sm text-gray-600">{e.email}</td>
                                                         <td className="px-4 py-2 text-sm text-gray-600">{e.phone}</td>
                                                         <td className="px-4 py-2 text-sm text-gray-600">{e.correspondenceAddress?.state || "-"}</td>
-                                                        <td className="px-4 py-2 uppercase text-xs font-bold text-blue-600">{e.status}</td>
+                                                        <td className="px-4 py-2 text-sm font-semibold text-gray-700">
+                                                            {e.outletCount}
+
+                                                            {e.outletCount > 0 && (
+                                                                <button
+                                                                    onClick={() => setOpenOutletList(e)}
+                                                                    className="ml-3 text-blue-600 underline text-xs hover:text-blue-800"
+                                                                >
+                                                                    View
+                                                                </button>
+                                                            )}
+                                                        </td>
                                                     </tr>
                                                 ))}
                                             </tbody>
@@ -546,6 +798,157 @@ const MapEmployee = () => {
                                     Assign Employee
                                 </button>
                             </div>
+                            <div className="bg-[#EDEDED] shadow-md rounded-lg p-6 mt-6">
+                                <h3 className="text-lg font-semibold text-gray-700 mb-4">
+                                    Assigned Employee-Retailer Pairs (
+                                    {filteredPairs.length} of{" "}
+                                    {assignedPairs.length})
+                                </h3>
+                                {/* State Filter for Assigned Pairs */}
+                                <div className="mb-4 max-w-xs">
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Filter by State</label>
+                                    <Select
+                                        value={pairStateFilter}
+                                        onChange={setPairStateFilter}
+                                        options={[
+                                            ...new Set(
+                                                assignedPairs.map(p => p.retailer?.state)
+                                            ),
+                                        ]
+                                            .filter(Boolean)
+                                            .map(s => ({ label: s, value: s }))}
+                                        placeholder="Select State"
+                                        isClearable
+                                        styles={customSelectStyles}
+                                    />
+                                </div>
+
+                                <div className="mb-4">
+                                    <input
+                                        type="text"
+                                        placeholder="Search by Outlet / Employee Code or Name"
+                                        value={searchAssignedPairs}
+                                        onChange={(e) => setSearchAssignedPairs(e.target.value)}
+                                        className="w-full px-4 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-red-600 focus:outline-none"
+                                    />
+                                </div>
+
+                                {loadingAssignedData ? (
+                                    <p className="text-gray-500 py-3">
+                                        Loading...
+                                    </p>
+                                ) : assignedPairs.length === 0 ? (
+                                    <p className="text-gray-500 py-3">
+                                        No assignments found for this campaign.
+                                    </p>
+                                ) : filteredPairs.length === 0 ? (
+                                    <p className="text-gray-500 py-3">
+                                        No results match your filters.
+                                    </p>
+                                ) : (
+                                    <div className="overflow-x-auto">
+                                        <table className="min-w-full divide-y divide-gray-200">
+                                            <thead className="bg-gray-100">
+                                                <tr>
+                                                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">
+                                                        S.No
+                                                    </th>
+                                                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">
+                                                        Outlet Code
+                                                    </th>
+                                                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">
+                                                        Outlet Name
+                                                    </th>
+                                                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">
+                                                        Employee Code
+                                                    </th>
+                                                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">
+                                                        Employee Name
+                                                    </th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="bg-white divide-y divide-gray-200">
+                                                {filteredPairs.map(
+                                                    (pair, index) => (
+                                                        <tr
+                                                            key={`${pair.retailer?._id}-${pair.employee?._id}-${index}`}
+                                                            className="hover:bg-gray-50"
+                                                        >
+                                                            <td className="px-4 py-2 text-sm">
+                                                                {index + 1}
+                                                            </td>
+                                                            <td className="px-4 py-2 text-sm font-medium text-gray-700">
+                                                                {pair.retailer.uniqueId}
+                                                            </td>
+                                                            <td className="px-4 py-2 text-sm text-gray-700">
+                                                                {pair.retailer.shopName}
+                                                            </td>
+                                                            <td className="px-4 py-2 text-sm font-medium text-gray-700">
+                                                                {pair.employee.employeeId}
+                                                            </td>
+                                                            <td className="px-4 py-2 text-sm text-gray-700">
+                                                                {pair.employee.name}
+                                                            </td>
+                                                        </tr>
+                                                    )
+                                                )}
+                                            </tbody>
+                                        </table>
+                                        <div className="mt-6 text-right flex gap-3 justify-end">
+                                            {/* Download filtered data */}
+                                            <button
+                                                onClick={handleDownloadFilteredReport}
+                                                className="px-6 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition"
+                                            >
+                                                Download Report
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                            {openOutletList && (
+                                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex justify-center items-center px-4 animate-fadeIn z-50">
+
+                                    <div className="bg-[#EDEDED] w-full max-w-md rounded-xl shadow-xl p-6 border border-gray-200 animate-slideUp">
+
+                                        {/* Header */}
+                                        <h2 className="text-xl font-bold mb-4 text-gray-800">
+                                            Outlets Assigned to
+                                            <span className="text-red-600"> {openOutletList.name}</span>
+                                        </h2>
+
+                                        {/* Outlet List */}
+                                        <ul className="space-y-3 max-h-80 overflow-y-auto pr-1">
+                                            {openOutletList.outletList.map((o, i) => (
+                                                <li
+                                                    key={i}
+                                                    className="p-3 border border-gray-200 rounded-md bg-gray-50 hover:bg-gray-100 transition"
+                                                >
+                                                    <p className="font-semibold text-gray-800 text-sm">
+                                                        {o.uniqueId || o.shopDetails?.uniqueId || "N/A"}
+                                                    </p>
+
+                                                    <p className="text-sm text-gray-700">
+                                                        {o.shopDetails?.shopName || o.name}
+                                                    </p>
+
+                                                    <p className="text-xs text-gray-500">
+                                                        {o.shopDetails?.shopAddress?.state}
+                                                    </p>
+                                                </li>
+                                            ))}
+                                        </ul>
+
+                                        {/* Close Button */}
+                                        <button
+                                            onClick={() => setOpenOutletList(null)}
+                                            className="mt-4 w-full bg-red-600 text-white py-2 rounded-lg font-semibold hover:bg-red-700 transition"
+                                        >
+                                            Close
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </>
                     )}
                 </div>

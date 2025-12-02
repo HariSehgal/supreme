@@ -111,8 +111,8 @@ const PostJob = () => {
 
   return (
     <>
-      <div className="min-h-screen flex justify-center items-center bg-white px-4 pt-8 pb-10">
-        <div className="w-full max-w-lg bg-white p-6 rounded-lg shadow-lg border border-gray-200">
+      <div className="min-h-screen flex justify-center items-center bg-[#171717] px-4 pt-8 pb-10">
+        <div className="w-full max-w-lg bg-[#EDEDED] p-6 rounded-lg shadow-lg border border-gray-400">
           <h1 className="text-2xl font-bold text-center mb-6 text-[#E4002B]">
             Job Details
           </h1>

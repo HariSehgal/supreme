@@ -78,10 +78,10 @@ const JobDetails = ({ jobId, onBack }) => {
     setSaving(false);
   };
 
-  if (!job) return <p>Loading...</p>;
+  if (!job) return <p className="text-gray-200 text-center mt-10">Loading...</p>;
 
   return (
-    <div>
+    <div className="p-6 bg-[#EDEDED] rounded shadow-md max-w-3xl mx-auto mt-10">
       <ToastContainer />
 
       <button

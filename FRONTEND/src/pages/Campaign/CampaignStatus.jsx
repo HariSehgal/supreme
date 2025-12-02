@@ -60,7 +60,7 @@ const CampaignStatus = ({ onViewCampaign }) => {
   };
 
   return (
-    <div className="p-6 min-h-screen bg-gray-50">
+    <div className="p-6 min-h-screen bg-[#171717]">
       <h2 className="text-2xl font-bold text-[#E4002B] mb-6 text-center">
         Campaign Status
       </h2>
@@ -107,7 +107,7 @@ const CampaignStatus = ({ onViewCampaign }) => {
         {filteredCampaigns.map((c) => (
           <div
             key={c._id}
-            className="bg-white shadow-md rounded-xl border border-gray-200 p-6 hover:shadow-lg transition 
+            className="bg-[#EDEDED] shadow-md rounded-xl border border-gray-200 p-6 hover:shadow-lg transition 
             h-full flex flex-col justify-between"
           >
             <div>
@@ -133,7 +133,7 @@ const CampaignStatus = ({ onViewCampaign }) => {
       </div>
 
       {!filteredCampaigns.length && (
-        <p className="text-gray-500 text-center mt-8 text-lg">
+        <p className="text-gray-200 text-center mt-8 text-lg">
           No campaigns found. Apply filters & search.
         </p>
       )}

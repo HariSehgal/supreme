@@ -186,9 +186,9 @@ const CreateEmployee = () => {
   return (
     <>
       <ToastContainer />
-      
-      <div className="min-h-screen bg-gray-50 px-4 pt-8 pb-10">
-        <div className="max-w-2xl mx-auto bg-white shadow rounded-lg p-6">
+
+      <div className="min-h-screen bg-[#171717] px-4 pt-8 pb-10">
+        <div className="max-w-2xl mx-auto bg-[#EDEDED] shadow rounded-lg p-6">
           <h2 className="text-2xl font-semibold mb-6 text-center text-[#E4002B]">Employee Registration</h2>
 
           <div className="mb-6">
@@ -198,11 +198,10 @@ const CreateEmployee = () => {
               <button
                 type="button"
                 onClick={() => setWorkerType("Permanent")}
-                className={`cursor-pointer w-44 md:w-52 border-2 rounded-xl p-4 flex flex-col items-center justify-center text-center transition-all duration-200 ${
-                  workerType === "Permanent"
+                className={`cursor-pointer w-44 md:w-52 border-2 rounded-xl p-4 flex flex-col items-center justify-center text-center transition-all duration-200 ${workerType === "Permanent"
                     ? "border-[#E4002B] bg-[#E4002B]/10 shadow"
-                    : "border-gray-200 hover:border-[#E4002B] hover:bg-gray-50"
-                }`}
+                    : "border-gray-400 hover:border-[#E4002B] hover:bg-gray-50"
+                  }`}
               >
                 <span className={`font-semibold ${workerType === "Permanent" ? "text-[#E4002B]" : "text-gray-700"}`}>
                   Permanent
@@ -213,11 +212,10 @@ const CreateEmployee = () => {
               <button
                 type="button"
                 onClick={() => setWorkerType("Contractual")}
-                className={`cursor-pointer w-44 md:w-52 border-2 rounded-xl p-4 flex flex-col items-center justify-center text-center transition-all duration-200 ${
-                  workerType === "Contractual"
+                className={`cursor-pointer w-44 md:w-52 border-2 rounded-xl p-4 flex flex-col items-center justify-center text-center transition-all duration-200 ${workerType === "Contractual"
                     ? "border-[#E4002B] bg-[#E4002B]/10 shadow"
-                    : "border-gray-200 hover:border-[#E4002B] hover:bg-gray-50"
-                }`}
+                    : "border-gray-400 hover:border-[#E4002B] hover:bg-gray-50"
+                  }`}
               >
                 <span className={`font-semibold ${workerType === "Contractual" ? "text-[#E4002B]" : "text-gray-700"}`}>
                   Contractual

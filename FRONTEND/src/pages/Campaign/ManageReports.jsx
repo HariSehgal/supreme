@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import Select from "react-select";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import SubmitReportForm from "./SubmitReportForm";
+import ReportDetailsModal from "./ReportDetailsModal";
 
 const customSelectStyles = {
     control: (provided, state) => ({
@@ -29,20 +31,36 @@ const ManageReports = () => {
     const [selectedCampaign, setSelectedCampaign] = useState(null);
     const [loadingCampaigns, setLoadingCampaigns] = useState(true);
 
-    // Party Type Selection
-    const [partyType, setPartyType] = useState(null);
+    // Retailer Selection for filtering
+    const [selectedRetailer, setSelectedRetailer] = useState(null);
+    const [availableRetailers, setAvailableRetailers] = useState([]);
+
+    // Employee Selection for filtering
+    const [selectedEmployee, setSelectedEmployee] = useState(null);
+    const [availableEmployees, setAvailableEmployees] = useState([]);
+
+    // Date Range Filter
+    const [fromDate, setFromDate] = useState("");
+    const [toDate, setToDate] = useState("");
 
     // State Filter
     const [selectedState, setSelectedState] = useState(null);
     const [availableStates, setAvailableStates] = useState([]);
 
-    // Search Query
-    const [searchQuery, setSearchQuery] = useState("");
-
     // Data
-    const [allReports, setAllReports] = useState([]);
-    const [displayCards, setDisplayCards] = useState([]);
+    const [displayReports, setDisplayReports] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [hasSearched, setHasSearched] = useState(false);
+
+    // Modal State
+    const [showModal, setShowModal] = useState(false);
+    const [retailers, setRetailers] = useState([]);
+    const [employees, setEmployees] = useState([]);
+    const [modalLoading, setModalLoading] = useState(false);
+
+    // Report Details Modal
+    const [showDetailsModal, setShowDetailsModal] = useState(false);
+    const [selectedReport, setSelectedReport] = useState(null);
 
     // ✅ Fetch Campaigns
     useEffect(() => {
@@ -88,12 +106,99 @@ const ManageReports = () => {
         }
     };
 
-    // ✅ Fetch Reports from Backend
-    // ✅ Fetch Reports from Backend
-    const fetchReports = async () => {
-        if (!selectedCampaign) return;
+    const fetchRetailersAndEmployees = async (campaignId) => {
+        setModalLoading(true);
+        try {
+            const token = localStorage.getItem("token");
+            const res = await fetch(
+                `https://supreme-419p.onrender.com/api/admin/campaign/${campaignId}/employee-retailer-mapping`,
+                {
+                    method: "GET",
+                    headers: { Authorization: `Bearer ${token}` },
+                }
+            );
+            const data = await res.json();
+
+            if (res.ok) {
+                // Extract all unique retailers from the mapping
+                const retailerSet = new Set();
+                const retailerData = [];
+                const stateSet = new Set();
+
+                data.employees.forEach(emp => {
+                    if (emp.retailers && emp.retailers.length > 0) {
+                        emp.retailers.forEach(retailer => {
+                            if (!retailerSet.has(retailer._id)) {
+                                retailerSet.add(retailer._id);
+                                retailerData.push(retailer);
+
+                                // Extract state
+                                const state = retailer.shopDetails?.shopAddress?.state;
+                                if (state) {
+                                    stateSet.add(state);
+                                }
+                            }
+                        });
+                    }
+                });
+
+                // Format retailers: Outlet Name • Outlet Code • Retailer Name
+                const formattedRetailers = retailerData.map(r => {
+                    const outletName = r.shopDetails?.shopName || 'N/A';
+                    const outletCode = r.uniqueId || 'N/A';
+                    const retailerName = r.name || 'N/A';
+                    const label = `${outletName} • ${outletCode} • ${retailerName}`;
+
+                    return {
+                        value: r._id,
+                        label: label,
+                        data: r
+                    };
+                });
+
+                // Format employees: Employee Name • Employee Code (only employees with retailers)
+                const formattedEmployees = data.employees.map(e => {
+                    const employeeName = e.name || 'N/A';
+                    const employeeCode = e.employeeId || 'N/A';
+                    const label = `${employeeName} • ${employeeCode}`;
+
+                    return {
+                        value: e._id,
+                        label: label,
+                        data: e
+                    };
+                });
+
+                // Format states
+                const formattedStates = Array.from(stateSet).map(state => ({
+                    value: state,
+                    label: state
+                }));
+
+                setRetailers(formattedRetailers);
+                setEmployees(formattedEmployees);
+                setAvailableRetailers(formattedRetailers);
+                setAvailableStates(formattedStates);
+                setAvailableEmployees(formattedEmployees);
+            }
+        } catch (err) {
+            console.error("Error fetching retailers/employees:", err);
+            toast.error("Failed to load retailers and employees", { theme: "dark" });
+        } finally {
+            setModalLoading(false);
+        }
+    };
+
+    // ✅ Fetch Reports for Retailer
+    const fetchRetailerReports = async () => {
+        if (!selectedCampaign) {
+            toast.error("Please select a campaign first", { theme: "dark" });
+            return;
+        }
 
         setLoading(true);
+        setHasSearched(true);
+
         try {
             const token = localStorage.getItem("token");
 
@@ -101,9 +206,24 @@ const ManageReports = () => {
             const params = new URLSearchParams();
             params.append("campaignId", selectedCampaign.value);
 
-            // ✅ FIX: Add the query params to the URL
+            if (selectedRetailer) {
+                params.append("retailerId", selectedRetailer.value);
+            }
+            if (selectedEmployee) {
+                params.append("employeeId", selectedEmployee.value);
+            }
+            if (fromDate) {
+                params.append("fromDate", fromDate);
+            }
+            if (fromDate) {
+                params.append("fromDate", fromDate);
+            }
+            if (toDate) {
+                params.append("toDate", toDate);
+            }
+
             const res = await fetch(
-                `https://supreme-419p.onrender.com/api/admin/employee/reports?${params.toString()}`,
+                `https://supreme-419p.onrender.com/api/admin/reports/campaign-retailers?${params.toString()}`,
                 {
                     method: "GET",
                     headers: { Authorization: `Bearer ${token}` },
@@ -116,143 +236,110 @@ const ManageReports = () => {
                 toast.error(data.message || "Error fetching reports", {
                     theme: "dark",
                 });
-                setAllReports([]);
+                setDisplayReports([]);
                 return;
             }
 
-            const reports = data.reports || [];
-            console.log("Fetched reports:", reports); // Debug log
-            setAllReports(reports);
+            let reports = data.reports || [];
 
-            toast.success(`Loaded ${reports.length} reports`, {
-                theme: "dark",
-            });
+            // Client-side filter by state if selected
+            if (selectedState) {
+                reports = reports.filter(report =>
+                    report.shopState === selectedState.value
+                );
+            }
+
+            if (selectedEmployee) {
+                reports = reports.filter(report =>
+                    report.employeeId?._id === selectedEmployee.value ||
+                    report.employeeId === selectedEmployee.value
+                );
+            }
+
+            setDisplayReports(reports);
+
+            if (reports.length === 0) {
+                toast.info("No reports found for the selected filters", {
+                    theme: "dark",
+                });
+            } else {
+                toast.success(`Found ${reports.length} report(s)`, {
+                    theme: "dark",
+                });
+            }
         } catch (err) {
             console.log("Reports Fetch Error:", err);
             toast.error("Failed to load reports", { theme: "dark" });
-            setAllReports([]);
+            setDisplayReports([]);
         } finally {
             setLoading(false);
         }
     };
 
-    // ✅ Extract unique states from reports (only states where reports exist)
-    const extractUniqueStates = (reports) => {
-        const states = [
-            ...new Set(
-                reports
-                    .map((r) => r.retailerId?.shopDetails?.shopAddress?.state)
-                    .filter(Boolean)
-            ),
-        ];
-        return states.map((s) => ({ label: s, value: s }));
-    };
+    const handleSubmitReport = async (formData) => {
+        try {
+            const token = localStorage.getItem("token");
 
-    // ✅ Apply Filters
-    const applyFilters = () => {
-        let filtered = [...allReports];
+            // Add campaignId to formData
+            formData.append("campaignId", selectedCampaign.value);
 
-        // Filter by campaign states (if campaign restricts states)
-        if (selectedCampaign?.data?.states) {
-            const allowedStates = selectedCampaign.data.states;
-            if (
-                !allowedStates.includes("All") &&
-                !allowedStates.includes("All States")
-            ) {
-                filtered = filtered.filter((r) =>
-                    allowedStates.includes(
-                        r.retailerId?.shopDetails?.shopAddress?.state
-                    )
-                );
-            }
-        }
-
-        // Update available states based on filtered reports
-        const uniqueStates = extractUniqueStates(filtered);
-        setAvailableStates(uniqueStates);
-
-        // Filter by selected state
-        if (selectedState) {
-            filtered = filtered.filter(
-                (r) =>
-                    r.retailerId?.shopDetails?.shopAddress?.state ===
-                    selectedState.value
-            );
-        }
-
-        // Filter by search query
-        if (searchQuery.trim() !== "") {
-            const query = searchQuery.toLowerCase();
-            filtered = filtered.filter((r) => {
-                const retailerName = r.retailerId?.name?.toLowerCase() || "";
-                const retailerCode =
-                    r.retailerId?.uniqueId?.toLowerCase() || "";
-                const employeeName = r.employeeId?.name?.toLowerCase() || "";
-                const employeeId =
-                    r.employeeId?.employeeId?.toLowerCase() || "";
-
-                if (partyType === "retailer") {
-                    return (
-                        retailerName.includes(query) ||
-                        retailerCode.includes(query)
-                    );
-                } else {
-                    return (
-                        employeeName.includes(query) ||
-                        employeeId.includes(query)
-                    );
+            const res = await fetch(
+                "https://supreme-419p.onrender.com/api/admin/admin/reports",
+                {
+                    method: "POST",
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                    body: formData,
                 }
-            });
-        }
+            );
 
-        setDisplayCards(filtered);
+            const data = await res.json();
 
-        if (filtered.length === 0 && (searchQuery || selectedState)) {
-            toast.info("No results match your search/filter.", {
-                theme: "dark",
-            });
+            if (res.ok) {
+                toast.success("Report submitted successfully", { theme: "dark" });
+                setShowModal(false);
+                // Refresh reports if already searched
+                if (hasSearched) {
+                    fetchRetailerReports();
+                }
+            } else {
+                toast.error(data.message || "Failed to submit report", { theme: "dark" });
+            }
+        } catch (err) {
+            console.error("Submit report error:", err);
+            toast.error("Failed to submit report", { theme: "dark" });
         }
     };
-
-    // ✅ Fetch reports when campaign changes
-    useEffect(() => {
-        if (selectedCampaign && partyType) {
-            fetchReports();
-        }
-    }, [selectedCampaign, partyType]);
-
-    // ✅ Apply filters when dependencies change
-    useEffect(() => {
-        if (allReports.length > 0) {
-            applyFilters();
-        }
-    }, [allReports, selectedState, searchQuery]);
 
     // ✅ Handle Campaign Change
     const handleCampaignChange = (selected) => {
         setSelectedCampaign(selected);
-        setPartyType(null);
+        setSelectedRetailer(null);
+        setSelectedEmployee(null);
         setSelectedState(null);
-        setSearchQuery("");
-        setDisplayCards([]);
-        setAllReports([]);
+        setFromDate("");
+        setToDate("");
+        setDisplayReports([]);
+        setHasSearched(false);
+        setAvailableRetailers([]);
+        setAvailableEmployees([]);
         setAvailableStates([]);
+
+        if (selected) {
+            fetchRetailersAndEmployees(selected.value);
+        }
     };
 
-    // ✅ Handle Party Type Change
-    const handlePartyTypeChange = (selected) => {
-        setPartyType(selected.value);
+    // Clear all filters
+    const handleClearFilters = () => {
+        setSelectedRetailer(null);
+        setSelectedEmployee(null);
         setSelectedState(null);
-        setSearchQuery("");
-        setDisplayCards([]);
-    };
-
-    // ✅ Handle View Details
-    const handleViewDetails = (reportId) => {
-        console.log("View details for report:", reportId);
-        toast.info(`Viewing details for report ${reportId}`, { theme: "dark" });
-        // Navigate to report details page or open modal
-        // Example: navigate(`/reports/${reportId}`);
+        setFromDate("");
+        setToDate("");
+        setDisplayReports([]);
+        setHasSearched(false);
     };
 
     const formatValue = (value) => {
@@ -272,49 +359,112 @@ const ManageReports = () => {
         });
     };
 
-    // ✅ Get display name based on party type
-    const getDisplayName = (report) => {
-        if (partyType === "retailer") {
-            // Retailer is populated correctly
-            if (
-                typeof report.retailerId === "object" &&
-                report.retailerId !== null
-            ) {
-                return report.retailerId.name || "N/A";
+    // Handle View Details
+    const handleViewDetails = (report) => {
+        setSelectedReport(report);
+        setShowDetailsModal(true);
+    };
+
+    // Handle Update Report
+    const handleUpdateReport = async (reportId, formData) => {
+        try {
+            const token = localStorage.getItem("token");
+
+            const res = await fetch(
+                `https://supreme-419p.onrender.com/api/admin/reports/${reportId}`,
+                {
+                    method: "PUT",
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                    body: formData,
+                }
+            );
+
+            const data = await res.json();
+
+            if (res.ok) {
+                toast.success("Report updated successfully", { theme: "dark" });
+                setShowDetailsModal(false);
+                // Refresh reports
+                if (hasSearched) {
+                    fetchRetailerReports();
+                }
+            } else {
+                toast.error(data.message || "Failed to update report", { theme: "dark" });
             }
-            return "N/A";
-        } else {
-            // Employee is NOT populated - it's just an ID string
-            if (
-                typeof report.employeeId === "object" &&
-                report.employeeId !== null
-            ) {
-                return report.employeeId.name || "N/A";
-            }
-            // Fallback: Show employee ID until backend is fixed
-            return `Employee (${report.employeeId})`;
+        } catch (err) {
+            console.error("Update report error:", err);
+            toast.error("Failed to update report", { theme: "dark" });
         }
     };
 
-    // ✅ Get report type display
-    const getReportType = (report) => {
-        return report.reportType || report.campaignId?.type || "General Report";
+    // Handle Delete Report
+    const handleDeleteReport = async (reportId) => {
+        if (!window.confirm("Are you sure you want to delete this report?")) {
+            return;
+        }
+
+        try {
+            const token = localStorage.getItem("token");
+
+            const res = await fetch(
+                `https://supreme-419p.onrender.com/api/admin/reports/${reportId}`,
+                {
+                    method: "DELETE",
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                }
+            );
+
+            const data = await res.json();
+
+            if (res.ok) {
+                toast.success("Report deleted successfully", { theme: "dark" });
+                setShowDetailsModal(false);
+                // Refresh reports
+                if (hasSearched) {
+                    fetchRetailerReports();
+                }
+            } else {
+                toast.error(data.message || "Failed to delete report", { theme: "dark" });
+            }
+        } catch (err) {
+            console.error("Delete report error:", err);
+            toast.error("Failed to delete report", { theme: "dark" });
+        }
     };
 
     return (
         <>
             <ToastContainer position="top-right" autoClose={3000} />
-            <div className="min-h-screen bg-gray-50 p-6">
+            <div className="min-h-screen bg-[#171717] p-6">
                 <div className="max-w-7xl mx-auto">
-                    <h1 className="text-3xl font-bold text-gray-800 mb-8">
+                    <h1 className="text-3xl font-bold text-[#E4002B] mb-8">
                         Manage Reports
                     </h1>
 
                     {/* Select Campaign */}
-                    <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-                        <h2 className="text-lg font-semibold mb-4 text-gray-700">
-                            Select Campaign *
-                        </h2>
+                    <div className="bg-[#EDEDED] rounded-lg shadow-md p-6 mb-6">
+                        <div className="flex justify-between items-center mb-4">
+                            <h2 className="text-lg font-semibold text-gray-700">
+                                Select Campaign *
+                            </h2>
+                            {selectedCampaign && (
+                                <button
+                                    onClick={() => {
+                                        setShowModal(true);
+                                        if (retailers.length === 0) {
+                                            fetchRetailersAndEmployees(selectedCampaign.value);
+                                        }
+                                    }}
+                                    className="bg-[#E4002B] text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-[#C3002B] transition flex items-center gap-2"
+                                >
+                                    <span>+</span> Add Report
+                                </button>
+                            )}
+                        </div>
                         <Select
                             value={selectedCampaign}
                             onChange={handleCampaignChange}
@@ -347,47 +497,18 @@ const ManageReports = () => {
                         )}
                     </div>
 
-                    {/* Select Type of Party */}
+                    {/* Filters - Only for Retailer */}
                     {selectedCampaign && (
-                        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-                            <h2 className="text-lg font-semibold mb-4 text-gray-700">
-                                Select Type of Party *
-                            </h2>
-                            <Select
-                                value={
-                                    partyType
-                                        ? {
-                                              label:
-                                                  partyType === "retailer"
-                                                      ? "Retailer"
-                                                      : "Employee",
-                                              value: partyType,
-                                          }
-                                        : null
-                                }
-                                onChange={handlePartyTypeChange}
-                                options={[
-                                    { label: "Retailer", value: "retailer" },
-                                    { label: "Employee", value: "employee" },
-                                ]}
-                                styles={customSelectStyles}
-                                className="max-w-md"
-                                placeholder="Select party type"
-                            />
-                        </div>
-                    )}
-
-                    {/* State Filter & Search */}
-                    {partyType && (
-                        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+                        <div className="bg-[#EDEDED] rounded-lg shadow-md p-6 mb-6">
                             <h2 className="text-lg font-semibold mb-4 text-gray-700">
                                 Filter Reports
                             </h2>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            {/* First Row - State, Retailer, Employee */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        State
+                                        State (Optional)
                                     </label>
                                     <Select
                                         value={selectedState}
@@ -397,129 +518,242 @@ const ManageReports = () => {
                                         placeholder="Select state"
                                         isSearchable
                                         isClearable
-                                        isDisabled={
-                                            loading ||
-                                            availableStates.length === 0
-                                        }
                                     />
                                 </div>
 
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Search
+                                        Retailer (Optional)
+                                    </label>
+                                    <Select
+                                        value={selectedRetailer}
+                                        onChange={setSelectedRetailer}
+                                        options={availableRetailers}
+                                        styles={customSelectStyles}
+                                        placeholder="Select retailer"
+                                        isSearchable
+                                        isClearable
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Employee (Optional)
+                                    </label>
+                                    <Select
+                                        value={selectedEmployee}
+                                        onChange={setSelectedEmployee}
+                                        options={availableEmployees}
+                                        styles={customSelectStyles}
+                                        placeholder="Select employee"
+                                        isSearchable
+                                        isClearable
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Second Row - Date Filters */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        From Date (Optional)
                                     </label>
                                     <input
-                                        type="text"
-                                        placeholder={`Search by ${
-                                            partyType === "retailer"
-                                                ? "Retailer Code / Name"
-                                                : "Employee ID / Name"
-                                        }`}
-                                        value={searchQuery}
-                                        onChange={(e) =>
-                                            setSearchQuery(e.target.value)
-                                        }
+                                        type="date"
+                                        value={fromDate}
+                                        onChange={(e) => setFromDate(e.target.value)}
+                                        className="w-full px-4 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-red-600 focus:outline-none"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        To Date (Optional)
+                                    </label>
+                                    <input
+                                        type="date"
+                                        value={toDate}
+                                        onChange={(e) => setToDate(e.target.value)}
                                         className="w-full px-4 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-red-600 focus:outline-none"
                                     />
                                 </div>
                             </div>
 
-                            {(searchQuery || selectedState) && (
+                            <div className="flex gap-3">
                                 <button
-                                    onClick={() => {
-                                        setSearchQuery("");
-                                        setSelectedState(null);
-                                    }}
-                                    className="text-sm text-red-600 underline hover:text-red-800"
+                                    onClick={fetchRetailerReports}
+                                    disabled={loading}
+                                    className="bg-[#E4002B] text-white px-6 py-2 rounded-md text-sm font-medium hover:bg-[#C3002B] transition disabled:bg-gray-400"
                                 >
-                                    Clear Filters
+                                    {loading ? "Searching..." : "Search Reports"}
                                 </button>
-                            )}
+
+                                {(selectedRetailer || selectedEmployee || selectedState || fromDate || toDate) && (
+                                    <button
+                                        onClick={handleClearFilters}
+                                        className="text-sm text-red-600 underline hover:text-red-800"
+                                    >
+                                        Clear Filters
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     )}
 
-                    {/* Display Cards */}
-                    {!loading && displayCards.length > 0 && (
-                        <div className="bg-white rounded-lg shadow-md p-6">
+                    {/* Display Table */}
+                    {!loading && hasSearched && displayReports.length > 0 && (
+                        <div className="bg-[#EDEDED] rounded-lg shadow-md p-6">
                             <div className="flex justify-between items-center mb-6">
                                 <h2 className="text-lg font-semibold text-gray-700">
-                                    Reports ({displayCards.length} found)
+                                    Reports ({displayReports.length} found)
                                 </h2>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                                {displayCards.map((report) => (
-                                    <div
-                                        key={report._id}
-                                        className="bg-white shadow-md rounded-xl border border-gray-200 p-6 hover:shadow-lg transition h-full flex flex-col justify-between"
-                                    >
-                                        <div>
-                                            {/* Name (Retailer or Employee based on party type) */}
-                                            <h2 className="text-xl font-bold text-gray-800 mb-3">
-                                                {getDisplayName(report)}
-                                            </h2>
-
-                                            {/* Type of Report */}
-                                            <p className="text-gray-600 mb-2">
-                                                <strong>Report Type:</strong>{" "}
-                                                {getReportType(report)}
-                                            </p>
-
-                                            {/* Last Updated */}
-                                            <p className="text-gray-600 mb-2">
-                                                <strong>Last Updated:</strong>{" "}
-                                                {formatDate(
-                                                    report.updatedAt ||
-                                                        report.createdAt
-                                                )}
-                                            </p>
-                                        </div>
-
-                                        {/* Divider */}
-                                        <div className="w-full h-[1px] bg-gray-200 my-4"></div>
-
-                                        {/* View Details Button */}
-                                        <button
-                                            onClick={() =>
-                                                handleViewDetails(report._id)
-                                            }
-                                            className="w-full bg-[#E4002B] text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-[#C3002B] transition"
-                                        >
-                                            View Details
-                                        </button>
-                                    </div>
-                                ))}
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full bg-white border border-gray-200 rounded-lg">
+                                    <thead className="bg-gray-100">
+                                        <tr>
+                                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 border-b">
+                                                Report Type
+                                            </th>
+                                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 border-b">
+                                                Retailer Name
+                                            </th>
+                                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 border-b">
+                                                Shop Name
+                                            </th>
+                                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 border-b">
+                                                Location
+                                            </th>
+                                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 border-b">
+                                                Employee
+                                            </th>
+                                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 border-b">
+                                                Submitted By
+                                            </th>
+                                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 border-b">
+                                                Date
+                                            </th>
+                                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 border-b">
+                                                Actions
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {displayReports.map((report, index) => (
+                                            <tr
+                                                key={report._id}
+                                                className={`${index % 2 === 0 ? "bg-white" : "bg-gray-50"
+                                                    } hover:bg-gray-100 transition`}
+                                            >
+                                                <td className="px-4 py-3 text-sm text-gray-800 border-b">
+                                                    {report.reportType || "N/A"}
+                                                </td>
+                                                <td className="px-4 py-3 text-sm text-gray-800 border-b">
+                                                    <div>{report.retailerName}</div>
+                                                    <div className="text-xs text-gray-500">
+                                                        {report.retailerCode || report.retailerUniqueId}
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-3 text-sm text-gray-800 border-b">
+                                                    {report.shopName || "N/A"}
+                                                </td>
+                                                <td className="px-4 py-3 text-sm text-gray-800 border-b">
+                                                    <div>{report.shopCity}</div>
+                                                    <div className="text-xs text-gray-500">
+                                                        {report.shopState}
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-3 text-sm text-gray-800 border-b">
+                                                    <div>{report.employeeName || "N/A"}</div>
+                                                    <div className="text-xs text-gray-500">
+                                                        {report.employeePhone || ""}
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-3 text-sm text-gray-800 border-b">
+                                                    {report.submittedByRole || "N/A"}
+                                                </td>
+                                                <td className="px-4 py-3 text-sm text-gray-800 border-b">
+                                                    {formatDate(report.createdAt)}
+                                                </td>
+                                                <td className="px-4 py-3 text-sm text-gray-800 border-b">
+                                                    <button
+                                                        onClick={() => handleViewDetails(report)}
+                                                        className="text-[#E4002B] hover:underline"
+                                                    >
+                                                        View Details
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     )}
 
                     {loading && (
-                        <div className="text-center py-8 text-gray-500">
+                        <div className="text-center py-8 text-gray-200">
                             Loading reports...
                         </div>
                     )}
 
-                    {!loading &&
-                        displayCards.length === 0 &&
-                        partyType &&
-                        allReports.length === 0 && (
-                            <div className="text-center py-8 text-gray-500">
-                                No reports found for this campaign. Try
-                                selecting a different campaign.
-                            </div>
-                        )}
+                    {!loading && hasSearched && displayReports.length === 0 && (
+                        <div className="text-center py-8 text-gray-500 bg-[#EDEDED] rounded-lg">
+                            No reports found for the selected filters. Try adjusting your search criteria.
+                        </div>
+                    )}
 
-                    {!loading &&
-                        displayCards.length === 0 &&
-                        partyType &&
-                        allReports.length > 0 && (
-                            <div className="text-center py-8 text-gray-500">
-                                No reports match your filters. Try adjusting
-                                your search criteria.
-                            </div>
-                        )}
+                    {!hasSearched && selectedCampaign && (
+                        <div className="text-center py-8 text-gray-400 bg-[#EDEDED] rounded-lg">
+                            Click "Search Reports" to view reports for this campaign
+                        </div>
+                    )}
                 </div>
             </div>
+
+            {/* Add Report Modal */}
+            {showModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                        <div className="p-6">
+                            <div className="flex justify-between items-center mb-4">
+                                <h2 className="text-2xl font-bold text-[#E4002B]">
+                                    Add Report
+                                </h2>
+                                <button
+                                    onClick={() => setShowModal(false)}
+                                    className="text-gray-500 hover:text-gray-700"
+                                >
+                                    <span className="text-2xl">&times;</span>
+                                </button>
+                            </div>
+
+                            {modalLoading ? (
+                                <div className="text-center py-8">Loading...</div>
+                            ) : (
+                                <SubmitReportForm
+                                    retailers={retailers}
+                                    employees={employees}
+                                    campaignId={selectedCampaign.value}
+                                    onSubmit={handleSubmitReport}
+                                    onCancel={() => setShowModal(false)}
+                                />
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Report Details Modal */}
+            {showDetailsModal && selectedReport && (
+                <ReportDetailsModal
+                    report={selectedReport}
+                    onClose={() => setShowDetailsModal(false)}
+                    onUpdate={handleUpdateReport}
+                    onDelete={handleDeleteReport}
+                />
+            )}
         </>
     );
 };

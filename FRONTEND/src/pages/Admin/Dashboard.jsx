@@ -175,10 +175,10 @@ const Dashboard = () => {
             default:
                 return (
                     <div className="text-center mt-10">
-                        <h1 className="text-3xl font-bold text-gray-800">
+                        <h1 className="text-3xl font-bold text-gray-200">
                             Welcome to Admin Dashboard
                         </h1>
-                        <p className="text-gray-600 mt-2">
+                        <p className="text-gray-500 mt-2">
                             Select an operation from the left sidebar to begin.
                         </p>
                     </div>
@@ -189,7 +189,7 @@ const Dashboard = () => {
     return (
         <>
             {/* TOP NAVBAR */}
-            <nav className="fixed top-0 w-full z-50 bg-black shadow-md px-6 md:px-10">
+            <nav className="fixed top-0 w-full z-50 bg-black shadow-md px-6 md:px-10 border-b border-red-500">
                 <div className="flex justify-between items-center py-4 max-w-screen-xl mx-auto relative">
                     <img
                         src="supreme.png"
@@ -203,15 +203,15 @@ const Dashboard = () => {
             </nav>
 
             {/* Layout */}
-            <div className="flex min-h-screen bg-gray-50 pt-20">
+            <div className="flex min-h-screen bg-[#171717] pt-20 overflow-hidden">
                 {/* SIDEBAR */}
-                <div className="w-70 bg-white shadow-md h-[calc(100vh-5rem)] fixed top-20 left-0 p-4 flex flex-col justify-between overflow-y-auto">
+                <div className="w-72 bg-black shadow-md h-[calc(100vh-5rem)] fixed top-20 left-0 p-4 flex flex-col justify-between overflow-y-auto">
                     <ul className="space-y-2">
                         {/* CREATE MENU */}
                         <li>
                             <button
                                 onClick={() => toggleMenu("create")}
-                                className="flex items-center justify-between w-full text-gray-700 font-medium px-3 py-2 rounded-lg hover:bg-gray-100 transition"
+                                className="flex items-center justify-between w-full text-white font-medium px-3 py-2 rounded-lg hover:bg-gray-800 transition"
                             >
                                 <span className="flex items-center gap-2">
                                     <FaPlus className="text-[#E4002B]" />
@@ -219,14 +219,14 @@ const Dashboard = () => {
                                 </span>
 
                                 {openMenu === "create" ? (
-                                    <IoIosArrowUp className="text-gray-600" />
+                                    <IoIosArrowUp className="text-white" />
                                 ) : (
-                                    <IoIosArrowDown className="text-gray-600" />
+                                    <IoIosArrowDown className="text-white" />
                                 )}
                             </button>
 
                             {openMenu === "create" && (
-                                <ul className="mt-2 ml-6 space-y-2 text-gray-600">
+                                <ul className="mt-2 ml-6 space-y-2 text-gray-500">
                                     <li
                                         onClick={() =>
                                             setSelectedComponent("client")
@@ -273,7 +273,7 @@ const Dashboard = () => {
                         <li>
                             <button
                                 onClick={() => toggleMenu("job")}
-                                className="flex items-center justify-between w-full text-gray-700 font-medium px-3 py-2 rounded-lg hover:bg-gray-100 transition"
+                                className="flex items-center justify-between w-full text-white font-medium px-3 py-2 rounded-lg hover:bg-gray-800 transition"
                             >
                                 <span className="flex items-center gap-2">
                                     <FaBriefcase className="text-[#E4002B]" />
@@ -281,14 +281,14 @@ const Dashboard = () => {
                                 </span>
 
                                 {openMenu === "job" ? (
-                                    <IoIosArrowUp className="text-gray-600" />
+                                    <IoIosArrowUp className="text-white" />
                                 ) : (
-                                    <IoIosArrowDown className="text-gray-600" />
+                                    <IoIosArrowDown className="text-white" />
                                 )}
                             </button>
 
                             {openMenu === "job" && (
-                                <ul className="mt-2 ml-6 space-y-2 text-gray-600">
+                                <ul className="mt-2 ml-6 space-y-2 text-gray-500">
                                     <li
                                         onClick={() =>
                                             setSelectedComponent("postJob")
@@ -335,7 +335,7 @@ const Dashboard = () => {
                         <li>
                             <button
                                 onClick={() => toggleMenu("campaignManagement")}
-                                className="flex items-center justify-between w-full text-gray-700 font-medium px-3 py-2 rounded-lg hover:bg-gray-100 transition"
+                                className="flex items-center justify-between w-full text-white font-medium px-3 py-2 rounded-lg hover:bg-gray-800 transition"
                             >
                                 <span className="flex items-center gap-2">
                                     <FaBriefcase className="text-[#E4002B]" />
@@ -343,14 +343,14 @@ const Dashboard = () => {
                                 </span>
 
                                 {openMenu === "campaignManagement" ? (
-                                    <IoIosArrowUp className="text-gray-600" />
+                                    <IoIosArrowUp className="text-white" />
                                 ) : (
-                                    <IoIosArrowDown className="text-gray-600" />
+                                    <IoIosArrowDown className="text-white" />
                                 )}
                             </button>
 
                             {openMenu === "campaignManagement" && (
-                                <ul className="mt-2 ml-6 space-y-2 text-gray-600">
+                                <ul className="mt-2 ml-6 space-y-2 text-gray-500">
                                     <li
                                         onClick={() =>
                                             setSelectedComponent(
@@ -463,7 +463,7 @@ const Dashboard = () => {
                     <div className="border-t pt-3">
                         <div
                             onClick={() => setSelectedComponent("bulkUpload")}
-                            className={`flex items-center gap-2 text-gray-700 font-medium px-3 py-2 rounded-lg hover:bg-gray-100 cursor-pointer ${
+                            className={`flex items-center gap-2 text-white font-medium px-3 py-2 rounded-lg hover:bg-gray-800 cursor-pointer ${
                                 selectedComponent === "bulkUpload"
                                     ? "text-[#E4002B] font-semibold"
                                     : ""

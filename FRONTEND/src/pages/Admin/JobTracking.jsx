@@ -4,7 +4,7 @@ import { FaSearch } from "react-icons/fa";
 
 const JobTracking = ( { onViewJob }) => {
     const [allJobs, setAllJobs] = useState([]);
-    const [filteredJobs, setFilteredJobs] = useState([]); // ✅ Show none initially
+    const [filteredJobs, setFilteredJobs] = useState([]); 
 
     const [searchTerm, setSearchTerm] = useState("");
     const [status, setStatus] = useState("active");
@@ -13,7 +13,7 @@ const JobTracking = ( { onViewJob }) => {
     const [dateRange, setDateRange] = useState(null);
     const [customDate, setCustomDate] = useState({ from: "", to: "" });
 
-    // ✅ Normalize date — removes time
+    // Normalize date — removes time
     const normalize = (dt) => {
         const d = new Date(dt);
         d.setHours(0, 0, 0, 0);
@@ -55,18 +55,18 @@ const JobTracking = ( { onViewJob }) => {
         value: d,
     }));
 
-    // ✅ Apply filters only when Search clicked
+    // Apply filters only when Search clicked
     const applyFilters = () => {
         let filtered = [...allJobs];
 
-        // ✅ Status filter
+        // Status filter
         if (status !== "all") {
             filtered = filtered.filter((job) =>
                 status === "active" ? job.isActive === true : job.isActive === false
             );
         }
 
-        // ✅ Search filter
+        // Search filter
         if (searchTerm.trim().length > 0) {
             filtered = filtered.filter(
                 (job) =>
@@ -75,17 +75,17 @@ const JobTracking = ( { onViewJob }) => {
             );
         }
 
-        // ✅ Department
+        // Department
         if (department) {
             filtered = filtered.filter((job) => job.title === department.value);
         }
 
-        // ✅ State
+        // State
         if (state) {
             filtered = filtered.filter((job) => job.location === state.value);
         }
 
-        // ✅ Custom Date (highest priority)
+        // Custom Date (highest priority)
         if (customDate.from && customDate.to) {
             const fromDate = normalize(customDate.from);
             const toDate = normalize(customDate.to);
@@ -99,7 +99,7 @@ const JobTracking = ( { onViewJob }) => {
             return;
         }
 
-        // ✅ Date Range
+        // Date Range
         if (dateRange && dateRange.value !== "custom") {
             let months = 0;
             if (dateRange.value === "3m") months = 3;
@@ -274,7 +274,7 @@ const JobTracking = ( { onViewJob }) => {
             </div>
 
             {filteredJobs.length === 0 && (
-                <p className="text-gray-500 text-center mt-10">
+                <p className="text-gray-200 text-center mt-10">
                     No jobs to display. Apply filters and search.
                 </p>
             )}

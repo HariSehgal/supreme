@@ -231,17 +231,17 @@ const CreateClient = () => {
       } else if (role.value === "state") {
         // For state level - send selected states and determine their regions
         statesArray = states.map((s) => s.label);
-        
+
         // Find which regions contain the selected states
         const selectedStateLabels = states.map((s) => s.label);
         const regionsSet = new Set();
-        
+
         Object.entries(regionStates).forEach(([region, statesList]) => {
           if (statesList.some(state => selectedStateLabels.includes(state))) {
             regionsSet.add(region);
           }
         });
-        
+
         regionsArray = Array.from(regionsSet);
       } else if (role.value === "regional") {
         // For regional level - send selected states and selected regions
@@ -273,11 +273,11 @@ const CreateClient = () => {
       const data = await response.json();
 
       if (!response.ok) {
-        toast.error(data.message || "Error creating client", {
+        toast.error(data.message || "Error in creating client", {
           theme: "dark",
         });
       } else {
-        toast.success("✅ Client created successfully!", {
+        toast.success("Client created successfully!", {
           theme: "dark",
         });
         resetForm();
@@ -294,7 +294,7 @@ const CreateClient = () => {
     <>
       <ToastContainer />
 
-      <div className="w-full max-w-lg bg-white shadow-md rounded-xl p-8 mx-auto">
+      <div className="w-full max-w-lg bg-[#EDEDED] shadow-md rounded-xl p-8 mx-auto mb-10">
         {/* Header */}
         <div className="mb-6 text-center">
           <h1 className="text-2xl font-bold text-[#E4002B]">Create Client</h1>
@@ -314,7 +314,7 @@ const CreateClient = () => {
               <FaUser className="absolute left-3 top-3 text-gray-400" />
               <input
                 type="text"
-                placeholder="Type name here"
+                placeholder="Enter your full name"
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-[#E4002B]"
                 required
                 value={name}
@@ -332,7 +332,7 @@ const CreateClient = () => {
               <FaEnvelope className="absolute left-3 top-3 text-gray-400" />
               <input
                 type="email"
-                placeholder="example@gmail.com"
+                placeholder="Enter your email address"
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-[#E4002B]"
                 required
                 value={email}
@@ -348,9 +348,14 @@ const CreateClient = () => {
             </label>
             <div className="relative">
               <FaPhoneAlt className="absolute left-3 top-3 text-gray-400" />
+
               <input
                 type="tel"
-                placeholder="123-456-7890"
+                placeholder="Enter your phone number"
+                maxLength={10}                     
+                onInput={(e) => {
+                  e.target.value = e.target.value.replace(/\D/g, "");
+                }}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-[#E4002B]"
                 required
                 value={contactNo}
@@ -368,7 +373,7 @@ const CreateClient = () => {
               <FaBuilding className="absolute left-3 top-3 text-gray-400" />
               <input
                 type="text"
-                placeholder="Organization Name"
+                placeholder="Enter organization name"
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-[#E4002B]"
                 required
                 value={organizationName}
@@ -388,7 +393,7 @@ const CreateClient = () => {
               value={role}
               onChange={handleRoleChange}
               isSearchable
-              placeholder="Select role"
+              placeholder="Select or search role"
             />
           </div>
 
@@ -405,7 +410,7 @@ const CreateClient = () => {
                 onChange={handleRegionChange}
                 isSearchable
                 isMulti
-                placeholder="Select regions"
+                placeholder="Select or search regions"
               />
             </div>
           )}
@@ -414,7 +419,7 @@ const CreateClient = () => {
           {role?.value === "national" && (
             <div>
               <label className="block text-sm font-medium mb-1.5 text-gray-700">
-                Region
+                Region <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -438,7 +443,7 @@ const CreateClient = () => {
                 onChange={setStates}
                 isSearchable
                 isMulti
-                placeholder="Select states"
+                placeholder="Select or search states"
               />
             </div>
           )}
@@ -447,7 +452,7 @@ const CreateClient = () => {
           {role?.value === "national" && (
             <div>
               <label className="block text-sm font-medium mb-1.5 text-gray-700">
-                State
+                State <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
